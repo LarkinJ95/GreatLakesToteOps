@@ -1,4 +1,4 @@
-const navigation = ["Operations", "Orders", "Dispatch", "Inventory", "Customers", "Billing", "Reports"];
+const navigation = [["Operations", "/"], ["Orders", "/orders"], ["Dispatch", "#dispatch"], ["Inventory", "#inventory"], ["Customers", "#customers"], ["Billing", "#billing"], ["Reports", "#reports"]] as const;
 
 const tasks = [
   ["08:00–10:00", "Deliver · GLMT-ORD-2026-000184", "Midland · 40 totes", "Ready"],
@@ -12,7 +12,7 @@ export default function Home() {
       <aside className="sidebar">
         <div className="brand-mark" aria-hidden="true">GL</div>
         <div className="brand"><strong>Great Lakes</strong><span>ToteOps</span></div>
-        <nav aria-label="Primary navigation">{navigation.map((item, index) => <a className={index === 0 ? "active" : ""} href="#workspace" key={item}>{item}</a>)}</nav>
+        <nav aria-label="Primary navigation">{navigation.map(([item, href], index) => <a className={index === 0 ? "active" : ""} href={href} key={item}>{item}</a>)}</nav>
         <div className="sidebar-footer"><span className="status-dot" />Field sync ready<br /><small>Midland HQ · EST</small></div>
       </aside>
       <section className="workspace" id="workspace">
