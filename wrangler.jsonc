@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "great-lakes-toteops",
+  "name": "greatlakestoteops",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-04-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -47,11 +47,11 @@
   },
   "vars": {
     "APP_NAME": "Great Lakes ToteOps",
-    "APP_ENV": "local",
-    "APP_BASE_URL": "http://localhost:3000",
+    "APP_ENV": "production",
+    "APP_BASE_URL": "https://toteops.greatlakesmovingtotes.com",
     "SESSION_TTL_HOURS": "12",
-    "TURNSTILE_ENABLED": "false",
-    "STRIPE_ENABLED": "false"
+    "TURNSTILE_ENABLED": "true",
+    "STRIPE_ENABLED": "true"
   },
   "env": {
     "preview": {
