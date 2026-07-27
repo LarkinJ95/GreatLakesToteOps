@@ -1,0 +1,23 @@
+# Copy to .dev.vars for local development. Never commit real secrets.
+# All secrets are managed with `wrangler secret put <NAME>` per environment.
+
+# Stripe (leave blank to run in manual-payment mode)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PUBLISHABLE_KEY=
+
+# Cloudflare Turnstile
+TURNSTILE_SECRET_KEY=
+TURNSTILE_SITE_KEY=
+
+# Email provider (e.g. Resend / MailChannels-compatible API key)
+EMAIL_API_KEY=
+EMAIL_FROM="Great Lakes Moving Totes <ops@greatlakesmovingtotes.com>"
+
+# SMS provider (e.g. Twilio)
+SMS_ACCOUNT_SID=
+SMS_AUTH_TOKEN=
+SMS_FROM_NUMBER=
+
+# Internal signing key for authorized document download tokens (required)
+DOC_LINK_SECRET=local-dev-only-change-me

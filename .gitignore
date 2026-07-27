@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.open-next/
+.wrangler/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+next-env.d.ts
+cloudflare-env.d.ts
+.DS_Store
+coverage/
+dist/
+dev-vars.local
+# Local SSH keys generated while configuring GitHub access.
+ToteOps
+ToteOps.pub
