@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .open-next/
+public/site/
 .wrangler/
 .env
 .env.local

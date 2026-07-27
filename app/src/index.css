@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 203 24% 18%;
+    --card: 0 0% 100%;
+    --card-foreground: 203 24% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 203 24% 18%;
+    --primary: 202 58% 20%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 180 50% 33%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 180 26% 94%;
+    --muted-foreground: 200 15% 42%;
+    --accent: 40 67% 55%;
+    --accent-foreground: 203 24% 18%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 200 20% 88%;
+    --input: 200 20% 88%;
+    --ring: 180 50% 33%;
+    --radius: 0.75rem;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-teal ring-offset-2;
+  }
+}
+
+@layer components {
+  .container-site {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-teal px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-teal-600 focus-visible:ring-offset-2;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-6 py-3.5 text-base font-semibold text-navy-900 shadow-sm transition-colors hover:bg-gold-400;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border-2 border-navy-700 px-6 py-3.5 text-base font-semibold text-navy-700 transition-colors hover:bg-navy-50;
+  }
+
+  .btn-outline-light {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border-2 border-white/70 px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10;
+  }
+
+  .eyebrow {
+    @apply text-sm font-bold uppercase tracking-widest text-teal;
+  }
+
+  .section-title {
+    @apply mt-2 text-3xl font-extrabold text-navy-700 sm:text-4xl;
+  }
+
+  .section-lead {
+    @apply mt-4 max-w-3xl text-lg leading-relaxed text-charcoal-400;
+  }
+
+  .card-lift {
+    @apply transition-shadow duration-200 hover:shadow-lg;
+  }
+
+  .wave-bg {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1440' height='120' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath d='M0,64 C240,120 480,8 720,48 C960,88 1200,32 1440,64 L1440,120 L0,120 Z' fill='%23EAF3F3'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: bottom;
+    background-size: 1440px 120px;
+  }
+
+  .tote-pattern {
+    background-image: radial-gradient(circle at 1px 1px, rgba(42, 127, 127, 0.14) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
