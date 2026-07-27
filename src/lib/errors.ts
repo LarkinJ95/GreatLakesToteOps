@@ -39,12 +39,12 @@ export class StateConflictError extends ApiError {
 }
 
 /** Wrap a route handler so ApiError subclasses become proper JSON responses. */
-export function withErrorHandling(
-  handler: (request: Request) => Promise<Response>,
-): (request: Request) => Promise<Response> {
-  return async (request: Request) => {
+export function withErrorHandling<Context = unknown>(
+  handler: (request: Request, context: Context) => Promise<Response>,
+): (request: Request, context: Context) => Promise<Response> {
+  return async (request: Request, context: Context) => {
     try {
-      return await handler(request);
+      return await handler(request, context);
     } catch (err) {
       if (err instanceof ApiError) return err.toResponse();
       console.error("Unhandled route error:", err);

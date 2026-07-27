@@ -1,0 +1,2 @@
+import { LoginForm } from "@/components/LoginForm";
+export default function LoginPage() { return <main className="login-page"><section className="login-card"><div className="brand-mark">GL</div><p className="eyebrow">GREAT LAKES MOVING TOTES</p><h1>Sign in to ToteOps</h1><p className="login-copy">Rental inventory, dispatch and field operations.</p><LoginForm /><p className="login-help">Need an account? Ask an owner or administrator to invite you.</p></section></main>; }
