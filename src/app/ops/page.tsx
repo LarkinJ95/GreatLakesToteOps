@@ -1,2 +1,1 @@
-import { redirect } from "next/navigation";
-export default function OpsPage() { redirect("/orders"); }
+export default function OpsPage() { return <main className="ops-home"><p className="eyebrow">STAFF OPERATIONS</p><h1>Great Lakes ToteOps</h1><p>Manage customers, rental orders, and warehouse equipment.</p><div><a href="/customers">Customers</a><a href="/orders">Order desk</a><a href="/inventory">Inventory</a></div></main>; }
