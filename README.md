@@ -68,3 +68,5 @@ npm run deploy:production
 ```
 
 For a preview branch use `npm run deploy:preview`; for a staging branch use `npm run deploy:staging`. Do **not** use `npx wrangler deploy` directly: OpenNext correctly detects the project but it cannot deploy until `opennextjs-cloudflare build` has written `.open-next`.
+
+As a compatibility fallback for Workers Builds projects that still use `npx wrangler deploy`, the `postinstall` hook runs the same Worker build during `npm ci`. Update the dashboard command anyway so the target environment remains explicit.

@@ -5,6 +5,7 @@
   "description": "Great Lakes ToteOps - Rental Inventory, Dispatch and Field Operations for Great Lakes Moving Totes LLC",
   "scripts": {
     "dev": "next dev",
+    "postinstall": "npm run build:worker",
     "build": "npm run cf-typegen && next build",
     "build:worker": "opennextjs-cloudflare build",
     "preview": "npm run build:worker && opennextjs-cloudflare preview",
