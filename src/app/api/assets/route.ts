@@ -1,0 +1,12 @@
+import { audit } from "@/lib/audit";
+import { requirePermission, requireUser } from "@/lib/auth";
+import { getEnv } from "@/lib/cloudflare";
+import { q } from "@/lib/db";
+import { ValidationError, withErrorHandling } from "@/lib/errors";
+import { jsonBody, optionalString } from "@/lib/http";
+import { createAsset } from "@/lib/services/assetService";
+import type { AssetType } from "@/lib/types";
+export const runtime = "edge";
+const assetTypes = new Set<AssetType>(["tote", "dolly", "hand_truck", "blanket_pack", "trailer", "vehicle", "other"]);
+export const GET = withErrorHandling(async (request) => { const ctx = await requireUser(request); requirePermission(ctx, "assets.view"); const env = await getEnv(); const status = new URL(request.url).searchParams.get("status"); const assets = await q(env.DB, `SELECT * FROM assets WHERE deleted_at IS NULL ${status ? "AND current_status = ?" : ""} ORDER BY asset_number LIMIT 200`, ...(status ? [status] : [])); return Response.json({ assets }); });
+export const POST = withErrorHandling(async (request) => { const ctx = await requireUser(request); requirePermission(ctx, "assets.manage"); const body = await jsonBody<{ assetType?: unknown; replacementCostCents?: unknown; manufacturer?: unknown; model?: unknown; color?: unknown; branchId?: unknown; storageLocationId?: unknown; notes?: unknown }>(request); if (typeof body.assetType !== "string" || !assetTypes.has(body.assetType as AssetType)) throw new ValidationError("A valid assetType is required"); if (typeof body.replacementCostCents !== "number" || !Number.isInteger(body.replacementCostCents) || body.replacementCostCents < 0) throw new ValidationError("replacementCostCents must be a non-negative integer"); const env = await getEnv(); const asset = await createAsset(env.DB, { assetType: body.assetType, replacementCostCents: body.replacementCostCents, manufacturer: optionalString(body.manufacturer, "Manufacturer", 100) ?? undefined, model: optionalString(body.model, "Model", 100) ?? undefined, color: optionalString(body.color, "Color", 50) ?? undefined, branchId: optionalString(body.branchId, "Branch", 100) ?? undefined, storageLocationId: optionalString(body.storageLocationId, "Storage location", 100) ?? undefined, notes: optionalString(body.notes, "Notes", 4000) ?? undefined }); await audit(env.DB, { actorUserId: ctx.user.id, action: "asset.created", entityType: "asset", entityId: asset.id, detail: { assetNumber: asset.asset_number }, ip: ctx.ip }); return Response.json({ asset }, { status: 201 }); });

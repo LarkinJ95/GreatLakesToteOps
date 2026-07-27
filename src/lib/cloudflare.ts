@@ -22,6 +22,7 @@ export interface Env {
   SMS_AUTH_TOKEN?: string;
   SMS_FROM_NUMBER?: string;
   DOC_LINK_SECRET?: string;
+  BOOTSTRAP_TOKEN?: string;
 }
 
 let cached: Env | null = null;

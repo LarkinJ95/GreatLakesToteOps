@@ -21,3 +21,6 @@ SMS_FROM_NUMBER=
 
 # Internal signing key for authorized document download tokens (required)
 DOC_LINK_SECRET=local-dev-only-change-me
+
+# Required only once to create the first owner with POST /api/auth/bootstrap.
+BOOTSTRAP_TOKEN=replace-with-a-long-random-value
