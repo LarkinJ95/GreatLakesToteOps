@@ -58,3 +58,13 @@ wrangler secret put BOOTSTRAP_TOKEN --env staging
 ```
 
 Use a unique bootstrap token in each environment and rotate it after the initial owner is created. Do not commit `.dev.vars`, production secrets, or Cloudflare credentials.
+
+### Worker Builds configuration
+
+Cloudflare Workers Builds must compile OpenNext before it invokes Wrangler. Set the deployment command for the production branch to:
+
+```sh
+npm run deploy:production
+```
+
+For a preview branch use `npm run deploy:preview`; for a staging branch use `npm run deploy:staging`. Do **not** use `npx wrangler deploy` directly: OpenNext correctly detects the project but it cannot deploy until `opennextjs-cloudflare build` has written `.open-next`.

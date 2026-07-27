@@ -2,7 +2,6 @@ import { requirePermission, requireUser } from "@/lib/auth";
 import { getEnv } from "@/lib/cloudflare";
 import { one, q } from "@/lib/db";
 import { withErrorHandling } from "@/lib/errors";
-export const runtime = "edge";
 export const GET = withErrorHandling(async (request) => {
   const ctx = await requireUser(request); requirePermission(ctx, "dashboard.view"); const env = await getEnv();
   const today = new Date().toISOString().slice(0, 10);

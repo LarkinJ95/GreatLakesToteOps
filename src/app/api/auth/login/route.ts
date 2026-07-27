@@ -6,8 +6,6 @@ import { withErrorHandling, UnauthorizedError, ValidationError } from "@/lib/err
 import { jsonBody, requiredString } from "@/lib/http";
 import type { UserRow } from "@/lib/types";
 
-export const runtime = "edge";
-
 export const POST = withErrorHandling(async (request) => {
   const body = await jsonBody<{ email?: unknown; password?: unknown; turnstileToken?: unknown }>(request);
   const email = requiredString(body.email, "Email", 254).toLowerCase();

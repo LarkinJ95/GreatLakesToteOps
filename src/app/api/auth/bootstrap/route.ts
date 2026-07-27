@@ -4,8 +4,6 @@ import { id, nowIso, one, run } from "@/lib/db";
 import { ForbiddenError, ValidationError, withErrorHandling } from "@/lib/errors";
 import { jsonBody, optionalString, requiredString } from "@/lib/http";
 
-export const runtime = "edge";
-
 /** One-time owner creation. Set BOOTSTRAP_TOKEN as a Worker secret before calling. */
 export const POST = withErrorHandling(async (request) => {
   const env = await getEnv();

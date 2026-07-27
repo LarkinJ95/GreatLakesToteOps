@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/cloudflare";
 
-export const runtime = "edge";
-
 export async function GET() {
   try {
     const env = await getEnv();
