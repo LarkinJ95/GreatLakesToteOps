@@ -190,14 +190,22 @@ export async function POST(request: Request, context: Ctx) {
     );
     if (!pkg)
       return error("Package is unavailable", "PACKAGE_UNAVAILABLE", 404);
-    const z =
+    const publicZoneIds: Record<string, string> = {
+      "zone-core": "zone_1_midland",
+      "zone-2": "zone_2_saginaw_bay",
+      "zone-3": "zone_3_glbr",
+    };
+    const zoneId =
       typeof input.zoneId === "string"
-        ? await one<{ id: string; name: string; zone_fee_cents: number }>(
-            env.DB,
-            "SELECT id,name,zone_fee_cents FROM service_zones WHERE id=? AND active=1",
-            input.zoneId,
-          )
+        ? (publicZoneIds[input.zoneId] ?? input.zoneId)
         : null;
+    const z = zoneId
+      ? await one<{ id: string; name: string; zone_fee_cents: number }>(
+          env.DB,
+          "SELECT id,name,zone_fee_cents FROM service_zones WHERE id=? AND active=1",
+          zoneId,
+        )
+      : null;
     const base =
       pkg.effective_date <= new Date().toISOString().slice(0, 10) &&
       (!pkg.expiration_date ||
@@ -206,6 +214,38 @@ export async function POST(request: Request, context: Ctx) {
         : pkg.standard_price_cents;
     let subtotal = base;
     const lines = [{ label: `${pkg.name} package`, amount: base / 100 }];
+    const requestedAddOns =
+      input.addOnSelections &&
+      typeof input.addOnSelections === "object" &&
+      !Array.isArray(input.addOnSelections)
+        ? (input.addOnSelections as Record<string, unknown>)
+        : {};
+    const configuredAddOns = await q<{
+      id: string;
+      name: string;
+      price_cents: number;
+      max_quantity: number;
+    }>(
+      env.DB,
+      "SELECT id,name,price_cents,max_quantity FROM public_addons WHERE active=1",
+    );
+    for (const addon of configuredAddOns) {
+      const quantity = Number(requestedAddOns[addon.id] ?? 0);
+      if (!Number.isInteger(quantity) || quantity < 0 || quantity > addon.max_quantity)
+        return error(`Invalid quantity for ${addon.name}`);
+      if (!quantity) continue;
+      const amount = addon.price_cents * quantity;
+      subtotal += amount;
+      lines.push({ label: `${addon.name} × ${quantity}`, amount: amount / 100 });
+    }
+    const extraWeeks = Number(requestedAddOns["addon-extra-week"] ?? 0);
+    if (!Number.isInteger(extraWeeks) || extraWeeks < 0 || extraWeeks > 4)
+      return error("Invalid quantity for Extra rental week");
+    if (extraWeeks) {
+      const amount = pkg.extra_week_price_cents * extraWeeks;
+      subtotal += amount;
+      lines.push({ label: `Extra rental week × ${extraWeeks}`, amount: amount / 100 });
+    }
     const promo =
       typeof input.promoCode === "string"
         ? await one<{
@@ -223,7 +263,7 @@ export async function POST(request: Request, context: Ctx) {
     const discount = promo
       ? promo.discount_type === "percent"
         ? Math.round((subtotal * promo.discount_value) / 100)
-        : promo.discount_value
+        : Math.min(subtotal, promo.discount_value)
       : 0;
     const zoneFee = z?.zone_fee_cents ?? 0,
       tax = Math.round((subtotal + zoneFee - discount) * 0.06),

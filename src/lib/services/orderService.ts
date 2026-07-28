@@ -264,7 +264,7 @@ export async function createOrder(
        base_rental_cents, zone_fee_cents, access_fee_cents, add_on_cents, discount_cents, tax_cents,
        total_cents, balance_due_cents, pricing_snapshot_json, internal_notes, customer_notes, preferred_delivery_window, preferred_pickup_window,
        created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'inquiry', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, 'inquiry', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     orderId,
     orderNumber,
     input.customerId,
