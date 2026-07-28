@@ -1,2 +1,3 @@
 import { DispatchDesk } from "@/components/DispatchDesk";
-export default function DispatchPage() { return <DispatchDesk />; }
+import { KimiOpsShell } from "@/components/KimiOpsDashboard";
+export default function DispatchPage() { return <KimiOpsShell title="Dispatch board"><DispatchDesk /></KimiOpsShell>; }

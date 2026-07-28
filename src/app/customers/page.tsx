@@ -1,2 +1,3 @@
 import { CustomerDesk } from "@/components/CustomerDesk";
-export default function CustomersPage() { return <CustomerDesk />; }
+import { KimiOpsShell } from "@/components/KimiOpsDashboard";
+export default function CustomersPage() { return <KimiOpsShell title="Customer desk"><CustomerDesk /></KimiOpsShell>; }
