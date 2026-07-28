@@ -100,6 +100,12 @@ export function BinDesk() {
     setMessage(r.ok ? `Bin ${bin.code} deleted.` : (p?.error?.message ?? "Bin could not be deleted."));
     if (r.ok) await load();
   }
+  async function release(bin: Bin) {
+    const r = await fetch("/api/bins", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ binId: bin.id, action: "release" }) });
+    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+    setMessage(r.ok ? `Released ${bin.code}; it is available for a new hold.` : (p?.error?.message ?? "The bin hold could not be released."));
+    if (r.ok) await load();
+  }
   return (
     <main className="desk">
       <header className="desk-header">
@@ -213,16 +219,9 @@ export function BinDesk() {
                   </span>
                 </div>
                 {b.order_id ? (
-                  <a className="record-link" href={`/orders/${b.order_id}`}>
-                    Open order
-                  </a>
+                  <div className="order-actions"><button className="secondary" onClick={() => void release(b)}>Release hold</button><a className="record-link" href={`/orders/${b.order_id}`}>Open order</a></div>
                 ) : b.customer_id ? (
-                  <a
-                    className="record-link"
-                    href={`/customers/${b.customer_id}`}
-                  >
-                    Open customer
-                  </a>
+                  <div className="order-actions"><button className="secondary" onClick={() => void release(b)}>Release hold</button><a className="record-link" href={`/customers/${b.customer_id}`}>Open customer</a></div>
                 ) : (
                   <button className="danger" onClick={() => void remove(b)}>Delete</button>
                 )}

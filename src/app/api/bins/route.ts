@@ -75,8 +75,18 @@ export const PATCH = withErrorHandling(async (request) => {
   const env = await getEnv(),
     body = await jsonBody<Record<string, unknown>>(request),
     binId = requiredString(body.binId, "binId", 100),
+    action = optionalString(body.action, "action", 30),
     requestedCustomerId = optionalString(body.customerId, "customerId", 100),
     orderId = optionalString(body.orderId, "orderId", 100);
+  if (action === "release") {
+    const result = await run(env.DB,
+      "UPDATE bin_assignments SET status='released',released_at=? WHERE bin_id=? AND status='active'",
+      nowIso(), binId);
+    if ((result.meta.changes ?? 0) === 0)
+      throw new ValidationError("This bin does not have an active customer or order hold");
+    await audit(env.DB, { actorUserId: ctx.user.id, action: "bin.released", entityType: "bin", entityId: binId, detail: {}, ip: ctx.ip });
+    return Response.json({ ok: true });
+  }
   const assetId = optionalString(body.assetId, "assetId", 100);
   if (assetId) {
     const asset = await q<{ id: string }>(env.DB, "SELECT id FROM assets WHERE id=? AND deleted_at IS NULL", assetId);

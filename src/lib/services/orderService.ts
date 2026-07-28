@@ -495,6 +495,16 @@ export async function transitionOrder(
       "Order changed concurrently; reload and retry",
     );
   }
+  // Once a truck leaves, its order is no longer occupying a staging/customer
+  // hold bin. Physical item locations remain independently tracked.
+  if (toStatus === "out_for_delivery") {
+    await run(
+      db,
+      "UPDATE bin_assignments SET status='released',released_at=? WHERE order_id=? AND status='active'",
+      now,
+      orderId,
+    );
+  }
 
   await recordStatus(
     db,
