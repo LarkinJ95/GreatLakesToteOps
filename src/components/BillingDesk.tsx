@@ -1,4 +1,166 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-type Order={id:string;order_number:string;customer_name:string;balance_due_cents:number;total_cents:number}; type Invoice={id:string;invoice_number:string;status:string;customer_name:string;order_number:string|null;total_cents:number;balance_due_cents:number}; const money=(c:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(c/100);
-export function BillingDesk(){const [orders,setOrders]=useState<Order[]>([]),[invoices,setInvoices]=useState<Invoice[]>([]),[error,setError]=useState(""),[saving,setSaving]=useState(false);async function load(){const r=await fetch("/api/invoices");if(!r.ok){setError("Sign in is required to use billing.");return;}const p=await r.json() as {orders:Order[];invoices:Invoice[]};setOrders(p.orders);setInvoices(p.invoices)}useEffect(()=>{void load()},[]);async function create(e:FormEvent<HTMLFormElement>){e.preventDefault();setSaving(true);setError("");const f=new FormData(e.currentTarget),r=await fetch("/api/invoices",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({orderId:f.get("orderId"),type:f.get("type"),notes:f.get("notes")})});const p=await r.json().catch(()=>null) as {error?:{message?:string}}|null;if(!r.ok)setError(p?.error?.message??"Invoice could not be created");else{e.currentTarget.reset();await load()}setSaving(false)}async function finalize(invoice:Invoice){const r=await fetch(`/api/invoices/${invoice.id}/finalize`,{method:"POST"});if(!r.ok){const p=await r.json().catch(()=>null) as {error?:{message?:string}}|null;setError(p?.error?.message??"Invoice could not be finalized")}else await load()}return <main className="desk"><header className="desk-header"><a href="/ops" className="back">← ToteOps</a><div><p className="eyebrow">BILLING</p><h1>Invoice desk</h1></div><a className="login-link" href="/orders">Order desk →</a></header><section className="desk-grid"><form className="create-order" onSubmit={create}><p className="eyebrow">NEW INVOICE</p><h2>Bill an order</h2><label>Order<select name="orderId" required><option value="">Select an order</option>{orders.map(o=><option key={o.id} value={o.id}>{o.order_number} · {o.customer_name} · {money(o.balance_due_cents||o.total_cents)}</option>)}</select></label><label>Invoice type<select name="type"><option value="standard">Standard rental</option><option value="deposit">Deposit</option><option value="final_rental">Final rental</option><option value="extension">Extension</option><option value="damage">Damage</option></select></label><label>Internal notes<textarea name="notes" rows={3}/></label>{error&&<p className="form-error">{error}</p>}<button className="primary" disabled={saving}>{saving?"Creating…":"Create draft invoice"}</button><p className="desk-hint">Finalizing locks the invoice for sending or recording payment. Online payment collection requires Stripe credentials.</p></form><section className="order-list"><p className="eyebrow">INVOICE REGISTER</p><h2>Recent invoices</h2><div className="orders-table">{invoices.map(i=><article key={i.id}><div><strong>{i.invoice_number}</strong><span>{i.customer_name}{i.order_number?` · ${i.order_number}`:""}</span></div><div><span>{i.status}</span><b>{money(i.balance_due_cents)}</b></div>{i.status==="draft"?<button className="secondary" onClick={()=>void finalize(i)}>Finalize</button>:<em>{i.status}</em>}</article>)}</div>{invoices.length===0&&<p className="empty">No invoices have been created yet.</p>}</section></section></main>}
+type Order = {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  balance_due_cents: number;
+  total_cents: number;
+};
+type Invoice = {
+  id: string;
+  invoice_number: string;
+  status: string;
+  customer_name: string;
+  order_number: string | null;
+  total_cents: number;
+  balance_due_cents: number;
+};
+const money = (c: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+    c / 100,
+  );
+export function BillingDesk() {
+  const [orders, setOrders] = useState<Order[]>([]),
+    [invoices, setInvoices] = useState<Invoice[]>([]),
+    [error, setError] = useState(""),
+    [saving, setSaving] = useState(false);
+  async function load() {
+    const r = await fetch("/api/invoices");
+    if (!r.ok) {
+      setError("Sign in is required to use billing.");
+      return;
+    }
+    const p = (await r.json()) as { orders: Order[]; invoices: Invoice[] };
+    setOrders(p.orders);
+    setInvoices(p.invoices);
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+  async function create(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    const f = new FormData(e.currentTarget),
+      r = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          orderId: f.get("orderId"),
+          type: f.get("type"),
+          notes: f.get("notes"),
+        }),
+      });
+    const p = (await r.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    if (!r.ok) setError(p?.error?.message ?? "Invoice could not be created");
+    else {
+      e.currentTarget.reset();
+      void load();
+    }
+    setSaving(false);
+  }
+  async function finalize(invoice: Invoice) {
+    const r = await fetch(`/api/invoices/${invoice.id}/finalize`, {
+      method: "POST",
+    });
+    if (!r.ok) {
+      const p = (await r.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      setError(p?.error?.message ?? "Invoice could not be finalized");
+    } else await load();
+  }
+  return (
+    <main className="desk">
+      <header className="desk-header">
+        <a href="/ops" className="back">
+          ← ToteOps
+        </a>
+        <div>
+          <p className="eyebrow">BILLING</p>
+          <h1>Invoice desk</h1>
+        </div>
+        <a className="login-link" href="/orders">
+          Order desk →
+        </a>
+      </header>
+      <section className="desk-grid">
+        <form className="create-order" onSubmit={create}>
+          <p className="eyebrow">NEW INVOICE</p>
+          <h2>Bill an order</h2>
+          <label>
+            Order
+            <select name="orderId" required>
+              <option value="">Select an order</option>
+              {orders.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.order_number} · {o.customer_name} ·{" "}
+                  {money(o.balance_due_cents || o.total_cents)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Invoice type
+            <select name="type">
+              <option value="standard">Standard rental</option>
+              <option value="deposit">Deposit</option>
+              <option value="final_rental">Final rental</option>
+              <option value="extension">Extension</option>
+              <option value="damage">Damage</option>
+            </select>
+          </label>
+          <label>
+            Internal notes
+            <textarea name="notes" rows={3} />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <button className="primary" disabled={saving}>
+            {saving ? "Creating…" : "Create draft invoice"}
+          </button>
+          <p className="desk-hint">
+            Finalizing locks the invoice for sending or recording payment.
+            Online payment collection requires Stripe credentials.
+          </p>
+        </form>
+        <section className="order-list">
+          <p className="eyebrow">INVOICE REGISTER</p>
+          <h2>Recent invoices</h2>
+          <div className="orders-table">
+            {invoices.map((i) => (
+              <article key={i.id}>
+                <div>
+                  <strong>{i.invoice_number}</strong>
+                  <span>
+                    {i.customer_name}
+                    {i.order_number ? ` · ${i.order_number}` : ""}
+                  </span>
+                </div>
+                <div>
+                  <span>{i.status}</span>
+                  <b>{money(i.balance_due_cents)}</b>
+                </div>
+                {i.status === "draft" ? (
+                  <button
+                    className="secondary"
+                    onClick={() => void finalize(i)}
+                  >
+                    Finalize
+                  </button>
+                ) : (
+                  <em>{i.status}</em>
+                )}
+              </article>
+            ))}
+          </div>
+          {invoices.length === 0 && (
+            <p className="empty">No invoices have been created yet.</p>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+}

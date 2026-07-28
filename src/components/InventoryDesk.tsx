@@ -39,7 +39,9 @@ export function InventoryDesk() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         assetType: f.get("assetType"),
-        replacementCostCents: Math.round(Number(f.get("replacementCostUsd")) * 100),
+        replacementCostCents: Math.round(
+          Number(f.get("replacementCostUsd")) * 100,
+        ),
         color: f.get("color"),
       }),
     });
@@ -49,7 +51,7 @@ export function InventoryDesk() {
     if (!r.ok) setError(p?.error?.message ?? "Asset could not be added");
     else {
       e.currentTarget.reset();
-      await load();
+      void load();
     }
     setSaving(false);
   }
