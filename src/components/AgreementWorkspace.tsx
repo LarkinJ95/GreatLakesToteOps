@@ -29,9 +29,14 @@ export function AgreementWorkspace({ id }: { id: string }) {
             {String(a.verification_code)}
           </span>
         </div>
-        <a className="primary" href={`/orders/${String(a.order_id)}`}>
-          Open order
-        </a>
+        <div className="record-actions">
+          <button className="secondary" onClick={() => window.print()}>
+            Print agreement
+          </button>
+          <a className="primary" href={`/orders/${String(a.order_id)}`}>
+            Open order
+          </a>
+        </div>
       </header>
       <div className="record-grid">
         <section>
@@ -58,6 +63,21 @@ export function AgreementWorkspace({ id }: { id: string }) {
             record. Signed documents are available when a document storage
             connection is configured.
           </p>
+        </section>
+        <section>
+          <h2>Agreement preview</h2>
+          {a.rendered_html ? (
+            <iframe
+              title="Agreement preview"
+              sandbox=""
+              className="agreement-preview"
+              srcDoc={String(a.rendered_html)}
+            />
+          ) : (
+            <p className="empty">
+              The agreement document has not been rendered yet.
+            </p>
+          )}
         </section>
       </div>
     </main>

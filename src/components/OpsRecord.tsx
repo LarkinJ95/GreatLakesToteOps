@@ -226,6 +226,43 @@ export function OpsRecord({
           <strong>{date(o.scheduled_pickup_date)}</strong>
         </article>
       </div>
+      <section className="record-editor">
+        <h2>Customer schedule & addresses</h2>
+        <div className="record-grid">
+          <div>
+            <strong>Delivery</strong>
+            <p>
+              {date(o.scheduled_delivery_date)}
+              <br />
+              {String(o.delivery_street ?? "Address to be confirmed")}
+              {o.delivery_unit ? `, ${String(o.delivery_unit)}` : ""}
+              <br />
+              {String(o.delivery_city ?? "")} {String(o.delivery_state ?? "")}{" "}
+              {String(o.delivery_zip ?? "")}
+            </p>
+          </div>
+          <div>
+            <strong>Pickup</strong>
+            <p>
+              {date(o.scheduled_pickup_date)}
+              <br />
+              {String(o.pickup_street ?? "Address to be confirmed")}
+              {o.pickup_unit ? `, ${String(o.pickup_unit)}` : ""}
+              <br />
+              {String(o.pickup_city ?? "")} {String(o.pickup_state ?? "")}{" "}
+              {String(o.pickup_zip ?? "")}
+            </p>
+          </div>
+          <div>
+            <strong>Customer preferences</strong>
+            <p>
+              {String(
+                o.customer_notes ?? "No customer access or time-window notes.",
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
       <div className="record-grid">
         <section>
           <h2>Pricing & discount</h2>
