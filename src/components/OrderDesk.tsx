@@ -112,7 +112,7 @@ export function OrderDesk() {
       error?: { message?: string };
     } | null;
     if (!r.ok) setError(p?.error?.message ?? "Order cannot advance yet");
-    else await load();
+    else void load();
   }
   return (
     <main className="desk">
@@ -192,7 +192,9 @@ export function OrderDesk() {
               {orders.map((o) => (
                 <article key={o.id}>
                   <div>
-                    <strong>{o.order_number}</strong>
+                    <a className="record-link" href={`/orders/${o.id}`}>
+                      {o.order_number}
+                    </a>
                     <span>{o.customer_name}</span>
                   </div>
                   <div>

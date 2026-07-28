@@ -8,6 +8,7 @@ type Assignment = {
   window_end: string | null;
   status: string;
   order_number: string | null;
+  order_id: string | null;
   customer_name: string | null;
   priority: number;
 };
@@ -135,7 +136,10 @@ export function DispatchDesk() {
               <article key={a.id}>
                 <div>
                   <strong>
-                    {a.assignment_number} · {a.assignment_type}
+                    <a className="record-link" href={`/dispatch/${a.id}`}>
+                      {a.assignment_number}
+                    </a>{" "}
+                    · {a.assignment_type}
                   </strong>
                   <span>
                     {a.order_number

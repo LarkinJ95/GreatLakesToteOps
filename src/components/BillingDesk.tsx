@@ -13,6 +13,7 @@ type Invoice = {
   status: string;
   customer_name: string;
   order_number: string | null;
+  order_id: string | null;
   total_cents: number;
   balance_due_cents: number;
 };
@@ -71,7 +72,7 @@ export function BillingDesk() {
         error?: { message?: string };
       } | null;
       setError(p?.error?.message ?? "Invoice could not be finalized");
-    } else await load();
+    } else void load();
   }
   return (
     <main className="desk">
@@ -133,7 +134,9 @@ export function BillingDesk() {
             {invoices.map((i) => (
               <article key={i.id}>
                 <div>
-                  <strong>{i.invoice_number}</strong>
+                  <a className="record-link" href={`/invoices/${i.id}`}>
+                    {i.invoice_number}
+                  </a>
                   <span>
                     {i.customer_name}
                     {i.order_number ? ` · ${i.order_number}` : ""}
