@@ -51,6 +51,7 @@ const links = [
   ["☷", "Order desk", "/orders"],
   ["➜", "Dispatch", "/dispatch"],
   ["$", "Billing", "/billing"],
+  ["↗", "Reports", "/reports"],
   ["▣", "Inventory", "/inventory"],
   ["⌗", "Warehouse bins", "/bins"],
 ] as const;

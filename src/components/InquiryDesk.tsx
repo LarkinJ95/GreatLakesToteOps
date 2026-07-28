@@ -1,93 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
-type Inquiry = {
-  id: string;
-  inquiry_type: string;
-  name: string;
-  email: string;
-  phone: string | null;
-  payload_json: string;
-  status: string;
-  created_at: string;
-};
+type Inquiry = { id: string; source: "inquiry" | "lead"; inquiry_type: string; name: string | null; email: string | null; phone: string | null; payload_json: string; status: string; created_at: string };
+const leadDetails = (item: Inquiry) => { let payload: Record<string, unknown> = {}; try { const value = JSON.parse(item.payload_json); if (value && typeof value === "object" && !Array.isArray(value)) payload = value as Record<string, unknown>; } catch { /* legacy record */ } const customer = payload.customer && typeof payload.customer === "object" && !Array.isArray(payload.customer) ? payload.customer as Record<string, unknown> : {}; const name = item.name || (typeof customer.name === "string" ? customer.name : [customer.firstName, customer.lastName].filter(v => typeof v === "string").join(" ")) || (typeof payload.name === "string" ? payload.name : "Website lead"); const email = item.email || (typeof customer.email === "string" ? customer.email : typeof payload.email === "string" ? payload.email : "No email"); const phone = item.phone || (typeof customer.phone === "string" ? customer.phone : typeof payload.phone === "string" ? payload.phone : ""); return { name, email, phone }; };
 export function InquiryDesk() {
-  const [items, setItems] = useState<Inquiry[]>([]),
-    [error, setError] = useState("");
-  const load = () =>
-    fetch("/api/inquiries")
-      .then(async (r) => {
-        if (!r.ok) throw new Error("Sign in is required to view inquiries.");
-        setItems(((await r.json()) as { inquiries: Inquiry[] }).inquiries);
-      })
-      .catch((e) => setError(e.message));
-  useEffect(() => {
-    void load();
-  }, []);
-  async function status(id: string, status: string) {
-    const r = await fetch("/api/inquiries", {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    });
-    if (r.ok) void load();
-  }
-  return (
-    <main className="desk">
-      <header className="desk-header">
-        <a href="/ops" className="back">
-          ← ToteOps
-        </a>
-        <div>
-          <p className="eyebrow">PUBLIC INBOX</p>
-          <h1>New inquiries</h1>
-        </div>
-        <a className="login-link" href="/customers">
-          Customers →
-        </a>
-      </header>
-      <section className="order-list">
-        <div>
-          <p className="eyebrow">CUSTOMER REQUESTS</p>
-          <h2>Availability and booking requests</h2>
-        </div>
-        {error && <p className="form-error">{error}</p>}
-        <div className="orders-table">
-          {items.map((i) => (
-            <article key={i.id}>
-              <div>
-                <strong>{i.name}</strong>
-                <span>
-                  {i.inquiry_type.replaceAll("_", " ")} · {i.email}
-                  {i.phone ? ` · ${i.phone}` : ""}
-                </span>
-              </div>
-              <div>
-                <span>{new Date(i.created_at).toLocaleString()}</span>
-                <b>{i.status}</b>
-              </div>
-              <div className="order-actions">
-                <a className="order-for-customer" href={`/customers`}>
-                  Create customer
-                </a>
-                <button
-                  className="secondary"
-                  onClick={() =>
-                    void status(
-                      i.id,
-                      i.status === "new" ? "reviewing" : "contacted",
-                    )
-                  }
-                >
-                  {i.status === "new" ? "Review" : "Contacted"}
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-        {!error && items.length === 0 && (
-          <p className="empty">No public inquiries yet.</p>
-        )}
-      </section>
-    </main>
-  );
+  const [items, setItems] = useState<Inquiry[]>([]), [error, setError] = useState(""), [busy, setBusy] = useState("");
+  const load = () => fetch("/api/inquiries").then(async r => { if (!r.ok) throw new Error("Sign in is required to view inquiries."); setItems(((await r.json()) as { inquiries: Inquiry[] }).inquiries); }).catch(e => setError(e.message));
+  useEffect(() => { void load(); }, []);
+  async function status(item: Inquiry, status: string) { setBusy(item.id); const r = await fetch("/api/inquiries", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: item.id, source: item.source, status }) }); if (r.ok) void load(); else setError("Unable to update this lead."); setBusy(""); }
+  async function convert(item: Inquiry) { setBusy(item.id); const r = await fetch("/api/inquiries", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: item.id, source: item.source }) }); const data = await r.json().catch(() => null) as { customerId?: string; error?: { message?: string } } | null; if (r.ok && data?.customerId) location.assign(`/customers/${data.customerId}`); else { setError(data?.error?.message ?? "This lead could not be converted."); setBusy(""); } }
+  return <main className="desk"><header className="desk-header"><div><p className="eyebrow">PUBLIC INBOX</p><h1>Leads & inquiries</h1></div><a className="login-link" href="/customers">Customers →</a></header><section className="order-list"><div><p className="eyebrow">CONVERSION QUEUE</p><h2>Website requests and leads</h2></div>{error && <p className="form-error">{error}</p>}<div className="orders-table">{items.map(item => { const details = leadDetails(item); return <article key={`${item.source}-${item.id}`}><div><strong>{details.name}</strong><span>{item.source === "lead" ? "Website lead" : item.inquiry_type.replaceAll("_", " ")} · {details.email}{details.phone ? ` · ${details.phone}` : ""}</span></div><div><span>{new Date(item.created_at).toLocaleString()}</span><b>{item.status}</b></div><div className="order-actions"><button className="secondary" disabled={busy === item.id} onClick={() => void convert(item)}>Convert to customer</button><button className="secondary" disabled={busy === item.id} onClick={() => void status(item, item.status === "new" ? "reviewing" : "contacted")}>{item.status === "new" ? "Review" : "Contacted"}</button></div></article>; })}</div>{!error && items.length === 0 && <p className="empty">No public leads yet.</p>}</section></main>;
 }

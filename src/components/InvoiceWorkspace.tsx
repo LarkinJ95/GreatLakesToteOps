@@ -62,11 +62,16 @@ export function InvoiceWorkspace({ id }: { id: string }) {
             {money(i.balance_due_cents)}
           </span>
         </div>
-        {String(i.status) === "draft" && (
-          <button className="primary" onClick={() => void finalize()}>
-            Finalize invoice
+        <div className="record-actions">
+          <button className="secondary" onClick={() => window.print()}>
+            Print invoice
           </button>
-        )}
+          {String(i.status) === "draft" && (
+            <button className="primary" onClick={() => void finalize()}>
+              Finalize invoice
+            </button>
+          )}
+        </div>
       </header>
       <div className="record-grid">
         <section>

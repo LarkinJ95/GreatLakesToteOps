@@ -10,14 +10,20 @@ type Assignment = {
   order_number: string | null;
   order_id: string | null;
   customer_name: string | null;
+  employee_name: string | null;
+  vehicle_number: string | null;
   priority: number;
 };
 type Order = { id: string; order_number: string; customer_name: string };
+type Employee = { id: string; name: string };
+type Vehicle = { id: string; unit_number: string };
 const today = () => new Date().toISOString().slice(0, 10);
 export function DispatchDesk() {
   const [date, setDate] = useState(today()),
     [items, setItems] = useState<Assignment[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
+    [employees, setEmployees] = useState<Employee[]>([]),
+    [vehicles, setVehicles] = useState<Vehicle[]>([]),
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false);
   async function load(day = date) {
@@ -29,7 +35,10 @@ export function DispatchDesk() {
       setError("Sign in is required to use dispatch.");
       return;
     }
-    setItems(((await a.json()) as { assignments: Assignment[] }).assignments);
+    const dispatch = (await a.json()) as { assignments: Assignment[]; employees: Employee[]; vehicles: Vehicle[] };
+    setItems(dispatch.assignments);
+    setEmployees(dispatch.employees);
+    setVehicles(dispatch.vehicles);
     setOrders(((await b.json()) as { orders: Order[] }).orders);
   }
   useEffect(() => {
@@ -49,6 +58,8 @@ export function DispatchDesk() {
         windowStart: f.get("windowStart"),
         windowEnd: f.get("windowEnd"),
         priority: Number(f.get("priority")),
+        employeeId: f.get("employeeId"),
+        vehicleId: f.get("vehicleId"),
       }),
     });
     const p = (await r.json().catch(() => null)) as {
@@ -115,6 +126,16 @@ export function DispatchDesk() {
               <input name="windowEnd" type="time" />
             </label>
           </div>
+          <div className="form-pair">
+            <label>
+              Driver / crew lead
+              <select name="employeeId"><option value="">Unassigned</option>{employees.map((employee) => <option value={employee.id} key={employee.id}>{employee.name}</option>)}</select>
+            </label>
+            <label>
+              Vehicle
+              <select name="vehicleId"><option value="">Unassigned</option>{vehicles.map((vehicle) => <option value={vehicle.id} key={vehicle.id}>{vehicle.unit_number}</option>)}</select>
+            </label>
+          </div>
           <label>
             Priority
             <select name="priority" defaultValue="2">
@@ -152,7 +173,7 @@ export function DispatchDesk() {
                     {a.window_start || "Unscheduled"}
                     {a.window_end ? `–${a.window_end}` : ""}
                   </span>
-                  <b>Priority {a.priority}</b>
+                  <b>{a.employee_name || "Unassigned"}{a.vehicle_number ? ` · ${a.vehicle_number}` : ""}</b>
                 </div>
                 <em>{a.status}</em>
               </article>
