@@ -56,6 +56,18 @@ export function OpsRecord({
     else await load();
     setSaving(false);
   }
+  async function saveSchedule(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const r = await fetch(`/api/orders/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))),
+    });
+    if (!r.ok) setError("Schedule or address update was not accepted.");
+    else void load();
+    setSaving(false);
+  }
   if (!data)
     return (
       <main className="record">
@@ -262,6 +274,88 @@ export function OpsRecord({
             </p>
           </div>
         </div>
+        <form className="record-form" onSubmit={saveSchedule}>
+          <div className="form-pair">
+            <label>
+              Delivery date
+              <input
+                name="deliveryDate"
+                type="date"
+                defaultValue={String(o.scheduled_delivery_date ?? "").slice(
+                  0,
+                  10,
+                )}
+              />
+            </label>
+            <label>
+              Pickup date
+              <input
+                name="pickupDate"
+                type="date"
+                defaultValue={String(o.scheduled_pickup_date ?? "").slice(
+                  0,
+                  10,
+                )}
+              />
+            </label>
+          </div>
+          <label>
+            Delivery street
+            <input
+              name="deliveryStreet"
+              defaultValue={String(o.delivery_street ?? "")}
+            />
+          </label>
+          <div className="form-pair">
+            <label>
+              Delivery city
+              <input
+                name="deliveryCity"
+                defaultValue={String(o.delivery_city ?? "")}
+              />
+            </label>
+            <label>
+              Delivery ZIP
+              <input
+                name="deliveryZip"
+                defaultValue={String(o.delivery_zip ?? "")}
+              />
+            </label>
+          </div>
+          <label>
+            Pickup street
+            <input
+              name="pickupStreet"
+              defaultValue={String(o.pickup_street ?? "")}
+            />
+          </label>
+          <div className="form-pair">
+            <label>
+              Pickup city
+              <input
+                name="pickupCity"
+                defaultValue={String(o.pickup_city ?? "")}
+              />
+            </label>
+            <label>
+              Pickup ZIP
+              <input
+                name="pickupZip"
+                defaultValue={String(o.pickup_zip ?? "")}
+              />
+            </label>
+          </div>
+          <label>
+            Customer schedule/access notes
+            <textarea
+              name="customerNotes"
+              defaultValue={String(o.customer_notes ?? "")}
+            />
+          </label>
+          <button className="secondary" disabled={saving}>
+            {saving ? "Saving…" : "Save schedule & addresses"}
+          </button>
+        </form>
       </section>
       <div className="record-grid">
         <section>

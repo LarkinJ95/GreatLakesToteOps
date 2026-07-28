@@ -1,7 +1,13 @@
 import { requirePermission, requireUser } from "@/lib/auth";
 import { getEnv } from "@/lib/cloudflare";
-import { one, q } from "@/lib/db";
-import { NotFoundError, withErrorHandling } from "@/lib/errors";
+import { nowIso, one, q, run } from "@/lib/db";
+import {
+  NotFoundError,
+  ValidationError,
+  withErrorHandling,
+} from "@/lib/errors";
+import { jsonBody, optionalString } from "@/lib/http";
+import { audit } from "@/lib/audit";
 
 export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
   async (request, context) => {
@@ -63,5 +69,75 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       statusHistory,
       cancellation,
     });
+  },
+);
+
+export const PATCH = withErrorHandling<{ params: Promise<{ id: string }> }>(
+  async (request, context) => {
+    const ctx = await requireUser(request);
+    requirePermission(ctx, "orders.edit");
+    const env = await getEnv(),
+      orderId = (await context.params).id,
+      body = await jsonBody<Record<string, unknown>>(request);
+    const order = await one<{
+      id: string;
+      delivery_address_id: string | null;
+      pickup_address_id: string | null;
+    }>(
+      env.DB,
+      "SELECT id,delivery_address_id,pickup_address_id FROM orders WHERE id=? AND deleted_at IS NULL",
+      orderId,
+    );
+    if (!order) throw new NotFoundError("Order");
+    const deliveryDate = optionalString(body.deliveryDate, "deliveryDate", 10),
+      pickupDate = optionalString(body.pickupDate, "pickupDate", 10),
+      notes = optionalString(body.customerNotes, "customerNotes", 4000);
+    if (deliveryDate && pickupDate && pickupDate < deliveryDate)
+      throw new ValidationError(
+        "Pickup date must be on or after delivery date",
+      );
+    await run(
+      env.DB,
+      "UPDATE orders SET scheduled_delivery_date=COALESCE(?,scheduled_delivery_date),scheduled_pickup_date=COALESCE(?,scheduled_pickup_date),customer_notes=COALESCE(?,customer_notes),updated_at=?,version=version+1 WHERE id=?",
+      deliveryDate,
+      pickupDate,
+      notes,
+      nowIso(),
+      orderId,
+    );
+    for (const [prefix, addressId] of [
+      ["delivery", order.delivery_address_id],
+      ["pickup", order.pickup_address_id],
+    ] as const) {
+      if (!addressId) continue;
+      const street = optionalString(
+          body[`${prefix}Street`],
+          `${prefix} street`,
+          200,
+        ),
+        city = optionalString(body[`${prefix}City`], `${prefix} city`, 100),
+        state = optionalString(body[`${prefix}State`], `${prefix} state`, 10),
+        zip = optionalString(body[`${prefix}Zip`], `${prefix} ZIP`, 20);
+      if (street || city || state || zip)
+        await run(
+          env.DB,
+          "UPDATE customer_addresses SET street=COALESCE(?,street),city=COALESCE(?,city),state=COALESCE(?,state),zip=COALESCE(?,zip),updated_at=? WHERE id=?",
+          street,
+          city,
+          state,
+          zip,
+          nowIso(),
+          addressId,
+        );
+    }
+    await audit(env.DB, {
+      actorUserId: ctx.user.id,
+      action: "order.schedule_updated",
+      entityType: "order",
+      entityId: orderId,
+      detail: { deliveryDate, pickupDate },
+      ip: ctx.ip,
+    });
+    return Response.json({ ok: true });
   },
 );
