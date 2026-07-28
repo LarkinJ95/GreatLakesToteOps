@@ -28,6 +28,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       agreements,
       statusHistory,
       cancellation,
+      bins,
     ] = await Promise.all([
       q(
         env.DB,
@@ -59,6 +60,11 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
         "SELECT * FROM cancellation_records WHERE order_id=?",
         orderId,
       ),
+      q(
+        env.DB,
+        "SELECT b.id,b.code,l.code location_code,ba.purpose,ba.notes FROM bin_assignments ba JOIN warehouse_bins b ON b.id=ba.bin_id JOIN storage_locations l ON l.id=b.storage_location_id WHERE ba.order_id=? AND ba.status='active' ORDER BY ba.assigned_at DESC",
+        orderId,
+      ),
     ]);
     return Response.json({
       order,
@@ -68,6 +74,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       agreements,
       statusHistory,
       cancellation,
+      bins,
     });
   },
 );

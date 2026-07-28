@@ -1,5 +1,5 @@
 import { getEnv } from "@/lib/cloudflare";
-import { id, nowIso, one, q, run } from "@/lib/db";
+import { escapeHtml, id, nowIso, one, q, run } from "@/lib/db";
 import { createOrder } from "@/lib/services/orderService";
 
 type Ctx = { params: Promise<{ endpoint: string[] }> };
@@ -452,7 +452,7 @@ export async function POST(request: Request, context: Ctx) {
             : typeof customer?.name === "string"
               ? customer.name
               : "Customer",
-        html = `<h1>Great Lakes Moving Totes Rental Agreement</h1><p>Order ${order.order_number}</p><p>Delivery: ${deliveryDate} ${String(input.deliveryWindow ?? "")}</p><p>Pickup: ${pickupDate} ${String(input.pickupWindow ?? "")}</p><p>Signed electronically by ${signature} on ${now}</p>`;
+        html = `<h1>Great Lakes Moving Totes Rental Agreement</h1><p>Order ${escapeHtml(order.order_number)}</p><p>Delivery: ${escapeHtml(deliveryDate)} ${escapeHtml(input.deliveryWindow)}</p><p>Pickup: ${escapeHtml(pickupDate)} ${escapeHtml(input.pickupWindow)}</p><p>Signed electronically by ${escapeHtml(signature)} on ${escapeHtml(now)}</p>`;
       await run(
         env.DB,
         "INSERT INTO agreements (id,agreement_number,order_id,customer_id,template_id,template_version,status,snapshot_json,rendered_html,html_checksum,accepted_at,acceptance_ip,acceptance_device_info,verification_code,created_at,updated_at) VALUES (?,?,?,?,?,?,'accepted',?,?,?,?,?,?,?,?,?,?)",
