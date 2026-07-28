@@ -509,6 +509,24 @@ export async function POST(request: Request, context: Ctx) {
       total,
       order.id,
     );
+    await run(
+      env.DB,
+      "INSERT INTO invoice_line_items (id,invoice_id,line_order,item_type,description,service_date,quantity,unit,unit_price_cents,taxable,tax_rate_percent,tax_cents,line_subtotal_cents,line_total_cents) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      id("ili"),
+      invoiceId,
+      1,
+      "package_rental",
+      `Website reservation ${order.order_number}`,
+      deliveryDate,
+      1,
+      "rental",
+      Math.max(0, total - order.tax_cents),
+      1,
+      0,
+      order.tax_cents,
+      Math.max(0, total - order.tax_cents),
+      total,
+    );
     return json(
       {
         ok: true,

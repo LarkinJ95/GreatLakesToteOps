@@ -58,6 +58,21 @@ export function AssetWorkspace({ id }: { id: string }) {
     if (r.ok) void load();
     setSaving(false);
   }
+  async function saveDetails(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const f = new FormData(e.currentTarget);
+    const r = await fetch(`/api/assets/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(f)),
+    });
+    setMessage(
+      r.ok ? "Asset details saved." : "Asset details could not be saved.",
+    );
+    if (r.ok) void load();
+    setSaving(false);
+  }
   if (!data)
     return (
       <main className="record">
@@ -97,6 +112,33 @@ export function AssetWorkspace({ id }: { id: string }) {
             Scan opens this asset workspace for a signed-in staff member. Every
             movement is retained below.
           </p>
+        </section>
+        <section>
+          <h2>Asset details</h2>
+          <form className="record-form" onSubmit={saveDetails}>
+            <label>
+              Manufacturer
+              <input
+                name="manufacturer"
+                defaultValue={String(a.manufacturer ?? "")}
+              />
+            </label>
+            <label>
+              Model
+              <input name="model" defaultValue={String(a.model ?? "")} />
+            </label>
+            <label>
+              Color
+              <input name="color" defaultValue={String(a.color ?? "")} />
+            </label>
+            <label>
+              Notes
+              <textarea name="notes" defaultValue={String(a.notes ?? "")} />
+            </label>
+            <button className="secondary" disabled={saving}>
+              Save asset details
+            </button>
+          </form>
         </section>
         <section>
           <h2>Scan movement</h2>
