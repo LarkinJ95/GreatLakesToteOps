@@ -29,6 +29,7 @@ export function OpsRecord({
 }) {
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
     [saving, setSaving] = useState(false);
   const base =
     kind === "customer" ? `/api/customers/${id}` : `/api/orders/${id}`;
@@ -95,6 +96,33 @@ export function OpsRecord({
       window.location.assign(kind === "customer" ? "/customers" : "/orders");
     } catch {
       setError(`This ${label} could not be deleted.`);
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function loadAllStagedAssets() {
+    if (!window.confirm("Load every staged item assigned to this order?")) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const r = await fetch(`/api/orders/${id}/load`, { method: "POST" });
+      const p = (await r.json().catch(() => null)) as {
+        loaded?: string[];
+        failed?: { assetNumber: string; message: string }[];
+        stagedCount?: number;
+        error?: { message?: string };
+      } | null;
+      if (!r.ok) {
+        setError(p?.error?.message ?? "The staged equipment could not be loaded.");
+        return;
+      }
+      const loaded = p?.loaded?.length ?? 0;
+      const failed = p?.failed?.length ?? 0;
+      setNotice(loaded ? `Loaded ${loaded} staged item${loaded === 1 ? "" : "s"}${failed ? `; ${failed} item${failed === 1 ? "" : "s"} need attention.` : "."}` : "No staged equipment is ready to load.");
+      await load();
+    } catch {
+      setError("The staged equipment could not be loaded.");
     } finally {
       setSaving(false);
     }
@@ -278,6 +306,7 @@ export function OpsRecord({
         </div>
       </header>
       {error && <p className="form-error">{error}</p>}
+      {notice && <p className="scan-status">{notice}</p>}
       <div className="record-kpis">
         <article>
           <span>Balance due</span>
@@ -563,7 +592,13 @@ export function OpsRecord({
           )}
         </section>
         <section>
-          <h2>Dispatch & equipment</h2>
+          <div className="section-heading">
+            <h2>Dispatch & equipment</h2>
+            <button type="button" className="primary" disabled={saving || !assets.some((asset) => String(asset.current_status) === "staged")} onClick={() => void loadAllStagedAssets()}>
+              Load all staged items
+            </button>
+          </div>
+          <p className="desk-hint">Loads every staged asset assigned to this order in one audited action.</p>
           {assignments.map((a, i) => (
             <div className="record-row" key={i}>
               <div>
