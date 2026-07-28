@@ -5,9 +5,17 @@ export const config = {
   /**
    * Base URL of the Great Lakes ToteOps public API (Cloudflare Workers).
    * Example: https://api.greatlakesmovingtotes.com
-   * Leave empty in development to use the built-in local simulation.
+   * Empty string = same origin (this server hosts /api/public/* in the
+   * full-stack deployment).
    */
   toteOpsApiUrl: (import.meta.env.VITE_TOTEOPS_API_URL ?? '').replace(/\/$/, ''),
+
+  /**
+   * When true (default), call the same-origin /api/public/* endpoints hosted
+   * by this app. Set VITE_SAME_ORIGIN_API=false for the static-only build,
+   * which falls back to the local simulation.
+   */
+  sameOriginApi: (import.meta.env.VITE_SAME_ORIGIN_API ?? 'true') === 'true',
 
   /**
    * Public API key sent as X-Api-Key on public endpoints. The Workers API
@@ -26,5 +34,5 @@ export const config = {
   portalUrl: import.meta.env.VITE_PORTAL_URL ?? '/login',
 } as const;
 
-/** True when the site is wired to the live ToteOps backend. */
-export const isLiveBackend = config.toteOpsApiUrl.length > 0;
+/** True when the site is wired to the live ToteOps backend (remote or same-origin). */
+export const isLiveBackend = config.toteOpsApiUrl.length > 0 || config.sameOriginApi;

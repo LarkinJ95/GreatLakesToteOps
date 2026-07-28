@@ -7,7 +7,7 @@
     "dev": "next dev",
     "postinstall": "npm run build:worker",
     "build": "npm run cf-typegen && next build",
-    "build:marketing": "npm --prefix app ci --ignore-scripts && npm --prefix app run build",
+    "build:marketing": "npm --prefix app ci --ignore-scripts && npm --prefix app run build:marketing",
     "build:worker": "npm run build:marketing && opennextjs-cloudflare build",
     "preview": "npm run build:worker && opennextjs-cloudflare preview",
     "deploy:preview": "npm run build:worker && opennextjs-cloudflare deploy --env preview",

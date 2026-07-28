@@ -33,12 +33,16 @@ export async function checkServiceArea(address: {
   zip: string;
 }): Promise<ZoneCheckResult> {
   if (isLiveBackend) {
-    // Production: server geocodes the exact address and tests it against
-    // active zone polygons + mileage rules in D1 — never ZIP-only promises.
-    return apiRequest<ZoneCheckResult>('/api/public/service-area/check', {
-      method: 'POST',
-      body: address,
-    });
+    try {
+      // Production: server checks the address against active zones + mileage
+      // rules — never ZIP-only promises.
+      return await apiRequest<ZoneCheckResult>('/api/public/service-area/check', {
+        method: 'POST',
+        body: address,
+      });
+    } catch (err) {
+      console.warn('[api] live service-area check failed, using local estimate', err);
+    }
   }
 
   await delay(600);
@@ -95,13 +99,17 @@ export async function checkAvailability(input: {
   deliveryZip: string;
 }): Promise<AvailabilityResult> {
   if (isLiveBackend) {
-    // Production: server checks clean inventory, existing reservations,
-    // delivery/pickup route capacity, service zone, and vehicle capacity —
-    // returning only a status, never exact counts.
-    return apiRequest<AvailabilityResult>('/api/public/availability/check', {
-      method: 'POST',
-      body: input,
-    });
+    try {
+      // Production: server checks clean inventory, existing reservations,
+      // delivery/pickup route capacity, service zone, and vehicle capacity —
+      // returning only a status, never exact counts.
+      return await apiRequest<AvailabilityResult>('/api/public/availability/check', {
+        method: 'POST',
+        body: input,
+      });
+    } catch (err) {
+      console.warn('[api] live availability check failed, using local estimate', err);
+    }
   }
 
   await delay(800);
@@ -243,10 +251,14 @@ export async function quotePrice(input: {
   pickupDate?: string;
 }): Promise<PriceSummary & { quoteId?: string }> {
   if (isLiveBackend) {
-    return apiRequest<PriceSummary & { quoteId: string }>('/api/public/pricing/quote', {
-      method: 'POST',
-      body: input,
-    });
+    try {
+      return await apiRequest<PriceSummary & { quoteId: string }>('/api/public/pricing/quote', {
+        method: 'POST',
+        body: input,
+      });
+    } catch (err) {
+      console.warn('[api] live quote failed, showing local estimate', err);
+    }
   }
   const pkg = packages.find((p) => p.slug === input.packageSlug) ?? packages[0];
   return calculatePrice({

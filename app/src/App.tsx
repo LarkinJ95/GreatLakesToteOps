@@ -26,10 +26,9 @@ function ScrollToTop() {
   return null;
 }
 
-export default function App() {
+function MarketingApp() {
   return (
     <div className="flex min-h-screen flex-col pb-[57px] xl:pb-0">
-      <ScrollToTop />
       <Header />
       <div className="flex-1">
         <Routes>
@@ -52,5 +51,14 @@ export default function App() {
       <Footer />
       <MobileCTA />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <ScrollToTop />
+      <MarketingApp />
+    </>
   );
 }
