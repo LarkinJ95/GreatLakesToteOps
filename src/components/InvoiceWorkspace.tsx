@@ -41,6 +41,20 @@ export function InvoiceWorkspace({ id }: { id: string }) {
     );
     if (r.ok) void load();
   }
+  async function recordPayment(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const f = new FormData(e.currentTarget);
+    const r = await fetch(`/api/invoices/${id}/payments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ amountCents: Math.round(Number(f.get("amountUsd")) * 100), method: f.get("method") }),
+    });
+    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+    setMessage(r.ok ? "Payment recorded." : p?.error?.message ?? "Payment could not be recorded.");
+    if (r.ok) { e.currentTarget.reset(); void load(); }
+    setSaving(false);
+  }
   if (!data)
     return (
       <main className="record">
@@ -127,9 +141,21 @@ export function InvoiceWorkspace({ id }: { id: string }) {
             ))
           ) : (
             <p className="empty">
-              No payment recorded. Payment processing requires the configured
-              payment integration.
+              No payment has been recorded.
             </p>
+          )}
+          {!["draft", "voided", "paid"].includes(String(i.status)) && (
+            <form className="record-form payment-form" onSubmit={recordPayment}>
+              <label>
+                Amount received (USD)
+                <input name="amountUsd" type="number" min="0.01" max={String(Number(i.balance_due_cents ?? 0) / 100)} step="0.01" required />
+              </label>
+              <label>
+                Method
+                <select name="method" defaultValue="card"><option value="card">Card</option><option value="ach">ACH</option><option value="check">Check</option><option value="cash">Cash</option><option value="account_terms">Account terms</option><option value="other">Other</option></select>
+              </label>
+              <button className="secondary" disabled={saving}>{saving ? "Recording…" : "Record payment"}</button>
+            </form>
           )}
         </section>
       </div>
