@@ -495,7 +495,7 @@ export async function POST(request: Request, context: Ctx) {
         html = `<h1>Great Lakes Moving Totes Rental Agreement</h1><p>Order ${escapeHtml(order.order_number)}</p><p>Delivery: ${escapeHtml(deliveryDate)} ${escapeHtml(input.deliveryWindow)}</p><p>Pickup: ${escapeHtml(pickupDate)} ${escapeHtml(input.pickupWindow)}</p><p>Signed electronically by ${escapeHtml(signature)} on ${escapeHtml(now)}</p>`;
       await run(
         env.DB,
-        "INSERT INTO agreements (id,agreement_number,order_id,customer_id,template_id,template_version,status,snapshot_json,rendered_html,html_checksum,accepted_at,acceptance_ip,acceptance_device_info,verification_code,created_at,updated_at) VALUES (?,?,?,?,?,?,'accepted',?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO agreements (id,agreement_number,order_id,customer_id,template_id,template_version,status,snapshot_json,rendered_html,html_checksum,accepted_at,acceptance_ip,acceptance_device_info,verification_code,created_at,updated_at) VALUES (?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         agreementId,
         number,
         order.id,
@@ -530,7 +530,7 @@ export async function POST(request: Request, context: Ctx) {
       total = order.total_cents;
     await run(
       env.DB,
-      "INSERT INTO invoices (id,invoice_number,invoice_type,customer_id,order_id,status,issue_date,due_date,service_date,subtotal_cents,tax_total_cents,total_cents,balance_due_cents,customer_billing_snapshot_json,company_snapshot_json,notes,verification_code,created_at,updated_at) VALUES (?,?,?,?,?,'finalized',date('now'),date('now','+30 days'),?,?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO invoices (id,invoice_number,invoice_type,customer_id,order_id,status,issue_date,due_date,service_date,subtotal_cents,tax_total_cents,total_cents,balance_due_cents,customer_billing_snapshot_json,company_snapshot_json,notes,verification_code,created_at,updated_at) VALUES (?, ?, ?, ?, ?, 'finalized', date('now'), date('now','+30 days'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       invoiceId,
       invoiceNumber,
       "standard",
