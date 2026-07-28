@@ -8,14 +8,16 @@ import { jsonBody, optionalString } from "@/lib/http";
 export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(async (request, context) => {
   const ctx = await requireUser(request); requirePermission(ctx, "customers.view"); const env = await getEnv(), customerId = (await context.params).id;
   const customer = await one(env.DB, "SELECT * FROM customers WHERE id=? AND deleted_at IS NULL", customerId); if (!customer) throw new NotFoundError("Customer");
-  const [orders, invoices, agreements, history, bins] = await Promise.all([
+  const [orders, invoices, agreements, history, bins, binHistory, equipment] = await Promise.all([
     q(env.DB, `SELECT o.*,p.name AS package_name FROM orders o LEFT JOIN rental_packages p ON p.id=o.package_id WHERE o.customer_id=? AND o.deleted_at IS NULL ORDER BY o.created_at DESC`, customerId),
     q(env.DB, "SELECT id,invoice_number,status,due_date,total_cents,balance_due_cents,order_id,created_at FROM invoices WHERE customer_id=? ORDER BY created_at DESC", customerId),
     q(env.DB, "SELECT id,agreement_number,status,order_id,accepted_at,expires_at,verification_code,created_at FROM agreements WHERE customer_id=? ORDER BY created_at DESC", customerId),
     q(env.DB, `SELECT action,entity_type,entity_id,detail_json,created_at FROM audit_logs WHERE (entity_type='customer' AND entity_id=?) OR entity_id IN (SELECT id FROM orders WHERE customer_id=?) ORDER BY created_at DESC LIMIT 100`, customerId, customerId),
-    q(env.DB, `SELECT b.id,b.code,l.code location_code,ba.purpose,ba.order_id,o.order_number FROM bin_assignments ba JOIN warehouse_bins b ON b.id=ba.bin_id JOIN storage_locations l ON l.id=b.storage_location_id LEFT JOIN orders o ON o.id=ba.order_id WHERE ba.customer_id=? AND ba.status='active' ORDER BY ba.assigned_at DESC`, customerId),
+    q(env.DB, `SELECT b.id,b.code,l.code location_code,ba.purpose,ba.order_id,o.order_number FROM bin_assignments ba JOIN warehouse_bins b ON b.id=ba.bin_id JOIN storage_locations l ON l.id=b.storage_location_id LEFT JOIN orders o ON o.id=ba.order_id WHERE (ba.customer_id=? OR ba.order_id IN (SELECT id FROM orders WHERE customer_id=?)) AND ba.status='active' ORDER BY ba.assigned_at DESC`, customerId, customerId),
+    q(env.DB, `SELECT b.id,b.code,l.code location_code,ba.status,ba.purpose,ba.order_id,o.order_number,ba.assigned_at,ba.released_at FROM bin_assignments ba JOIN warehouse_bins b ON b.id=ba.bin_id JOIN storage_locations l ON l.id=b.storage_location_id LEFT JOIN orders o ON o.id=ba.order_id WHERE ba.customer_id=? OR ba.order_id IN (SELECT id FROM orders WHERE customer_id=?) ORDER BY ba.assigned_at DESC`, customerId, customerId),
+    q(env.DB, `SELECT oa.id allocation_id,oa.order_id,o.order_number,o.order_status,a.id asset_id,a.asset_number,a.asset_type,a.current_status,a.current_condition,oa.assigned_at,oa.delivered_at,oa.picked_up_at,oa.warehouse_return_at,oa.missing,oa.damaged FROM order_assets oa JOIN orders o ON o.id=oa.order_id JOIN assets a ON a.id=oa.asset_id WHERE o.customer_id=? ORDER BY CASE WHEN oa.warehouse_return_at IS NULL AND oa.missing=0 THEN 0 ELSE 1 END,oa.assigned_at DESC`, customerId),
   ]);
-  return Response.json({ customer, orders, invoices, agreements, history, bins });
+  return Response.json({ customer, orders, invoices, agreements, history, bins, binHistory, equipment });
 });
 
 export const PATCH = withErrorHandling<{ params: Promise<{ id: string }> }>(async (request, context) => {

@@ -29,6 +29,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       statusHistory,
       cancellation,
       bins,
+      binHistory,
       equipmentAvailability,
     ] = await Promise.all([
       q(
@@ -38,7 +39,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       ),
       q(
         env.DB,
-        "SELECT a.id,a.asset_number,a.asset_type,a.current_status,oa.delivered_at,oa.picked_up_at,oa.missing,oa.damaged FROM order_assets oa JOIN assets a ON a.id=oa.asset_id WHERE oa.order_id=?",
+        "SELECT a.id,a.asset_number,a.asset_type,a.current_status,a.current_condition,oa.assigned_at,oa.delivered_at,oa.picked_up_at,oa.warehouse_return_at,oa.missing,oa.damaged FROM order_assets oa JOIN assets a ON a.id=oa.asset_id WHERE oa.order_id=? ORDER BY oa.assigned_at DESC",
         orderId,
       ),
       q(
@@ -68,6 +69,11 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       ),
       q(
         env.DB,
+        "SELECT b.id,b.code,l.code location_code,ba.status,ba.purpose,ba.notes,ba.assigned_at,ba.released_at FROM bin_assignments ba JOIN warehouse_bins b ON b.id=ba.bin_id JOIN storage_locations l ON l.id=b.storage_location_id WHERE ba.order_id=? ORDER BY ba.assigned_at DESC",
+        orderId,
+      ),
+      q(
+        env.DB,
         "SELECT asset_type,COUNT(*) AS total_count,SUM(CASE WHEN current_status='clean_inventory' THEN 1 ELSE 0 END) AS clean_available_count,SUM(CASE WHEN current_order_id=? THEN 1 ELSE 0 END) AS allocated_to_order_count FROM assets WHERE deleted_at IS NULL AND asset_type IN ('tote','dolly') GROUP BY asset_type",
         orderId,
       ),
@@ -81,6 +87,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       statusHistory,
       cancellation,
       bins,
+      binHistory,
       equipmentAvailability,
     });
   },

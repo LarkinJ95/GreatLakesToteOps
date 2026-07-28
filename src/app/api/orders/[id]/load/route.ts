@@ -22,6 +22,8 @@ export const POST = withErrorHandling<{ params: Promise<{ id: string }> }>(
       "SELECT a.id,a.asset_number,a.qr_code_value FROM order_assets oa JOIN assets a ON a.id=oa.asset_id WHERE oa.order_id=? AND oa.picked_up_at IS NULL AND a.deleted_at IS NULL AND a.current_status='staged' ORDER BY a.asset_number",
       orderId,
     );
+    if (!staged.length)
+      return Response.json({ loaded: [], failed: [], stagedCount: 0, message: "No staged assets are currently assigned to this order." });
     const timestamp = new Date().toISOString();
     const loaded: string[] = [], failed: { assetNumber: string; message: string }[] = [];
     for (const asset of staged) {
@@ -46,6 +48,11 @@ export const POST = withErrorHandling<{ params: Promise<{ id: string }> }>(
       detail: { loaded, failed, stagedCount: staged.length },
       ip: ctx.ip,
     });
-    return Response.json({ loaded, failed, stagedCount: staged.length });
+    return Response.json({
+      loaded, failed, stagedCount: staged.length,
+      message: loaded.length
+        ? `Loaded ${loaded.length} of ${staged.length} staged asset(s).`
+        : `No assets were loaded. ${failed.map((item) => `${item.assetNumber}: ${item.message}`).join(" ")}`,
+    });
   },
 );

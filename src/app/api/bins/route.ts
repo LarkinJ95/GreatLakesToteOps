@@ -71,10 +71,21 @@ export const PATCH = withErrorHandling(async (request) => {
   const env = await getEnv(),
     body = await jsonBody<Record<string, unknown>>(request),
     binId = requiredString(body.binId, "binId", 100),
-    customerId = optionalString(body.customerId, "customerId", 100),
+    requestedCustomerId = optionalString(body.customerId, "customerId", 100),
     orderId = optionalString(body.orderId, "orderId", 100);
-  if (!customerId && !orderId)
+  if (!requestedCustomerId && !orderId)
     throw new ValidationError("Choose a customer or order for this bin");
+  // An order hold always belongs to that order's customer. Store both links so
+  // the customer profile and the order workspace show the same physical bin.
+  let customerId = requestedCustomerId;
+  if (orderId) {
+    const order = await q<{ customer_id: string }>(
+      env.DB, "SELECT customer_id FROM orders WHERE id=? AND deleted_at IS NULL", orderId);
+    if (!order[0]) throw new ValidationError("The selected order was not found");
+    if (customerId && customerId !== order[0].customer_id)
+      throw new ValidationError("The selected customer does not own this order");
+    customerId = order[0].customer_id;
+  }
   await run(
     env.DB,
     "UPDATE bin_assignments SET status='released',released_at=? WHERE bin_id=? AND status='active'",
