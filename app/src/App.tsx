@@ -14,7 +14,6 @@ import { FaqPage } from '@/pages/FaqPage';
 import { About } from '@/pages/About';
 import { Contact } from '@/pages/Contact';
 import { Book } from '@/pages/Book';
-import { Login } from '@/pages/Login';
 import { Legal } from '@/pages/Legal';
 import { NotFound } from '@/pages/NotFound';
 
@@ -43,7 +42,7 @@ function MarketingApp() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/book" element={<Book />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<StaffLoginRedirect />} />
           <Route path="/legal/:slug" element={<Legal />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -52,6 +51,12 @@ function MarketingApp() {
       <MobileCTA />
     </div>
   );
+}
+
+/** Staff authentication is owned by the secure ToteOps app, never Vite state. */
+function StaffLoginRedirect() {
+  useEffect(() => { window.location.replace('/login'); }, []);
+  return <main className="grid min-h-[50vh] place-items-center text-sm text-charcoal-500">Opening staff sign in…</main>;
 }
 
 export default function App() {

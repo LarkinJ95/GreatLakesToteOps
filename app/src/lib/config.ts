@@ -30,7 +30,7 @@ export const config = {
    */
   turnstileSiteKey: import.meta.env.VITE_TURNSTILE_SITE_KEY ?? '',
 
-  /** Customer portal URL on the ToteOps app (agreement, payment, account). */
+  /** Secure staff login on the ToteOps app. */
   portalUrl: import.meta.env.VITE_PORTAL_URL ?? '/login',
 } as const;
 

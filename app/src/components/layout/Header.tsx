@@ -85,7 +85,7 @@ export function Header() {
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-700 hover:text-teal"
             >
               <User className="h-4 w-4" aria-hidden />
-              Customer Login
+              Staff Login
             </a>
             <Link to="/book" className="btn-gold !px-5 !py-2.5 !text-sm">
               Check Availability
@@ -129,7 +129,7 @@ export function Header() {
                   Check Availability
                 </Link>
                 <a href={config.portalUrl} onClick={() => setOpen(false)} className="btn-outline">
-                  <User className="h-4 w-4" aria-hidden /> Customer Login
+                  <User className="h-4 w-4" aria-hidden /> Staff Login
                 </a>
                 <a href={site.phoneHref} className="btn-outline">
                   <Phone className="h-4 w-4" aria-hidden /> {site.phone}
