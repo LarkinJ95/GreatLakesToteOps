@@ -412,16 +412,39 @@ export async function POST(request: Request, context: Ctx) {
       salesChannel: "website",
       customerNotes: `Preferred delivery window: ${String(input.deliveryWindow ?? "")}; preferred pickup window: ${String(input.pickupWindow ?? "")}; ${String(input.access ?? "")}`,
     });
-    const template = await one<{ id: string; version: number }>(
+    let template = await one<{ id: string; version: number }>(
       env.DB,
       "SELECT t.id,v.version FROM agreement_templates t JOIN agreement_template_versions v ON v.template_id=t.id AND v.status='active' WHERE t.active=1 AND t.template_type='standard_residential' LIMIT 1",
     );
+    if (!template) {
+      const templateId = id("agt"),
+        versionId = id("agv");
+      await run(
+        env.DB,
+        "INSERT INTO agreement_templates (id,name,description,template_type,customer_type,active,created_at,updated_at) VALUES (?,?,?,'standard_residential','residential',1,?,?)",
+        templateId,
+        "Website residential rental agreement",
+        "Standard electronically signed reservation agreement",
+        now,
+        now,
+      );
+      await run(
+        env.DB,
+        "INSERT INTO agreement_template_versions (id,template_id,version,status,effective_date,html_body,created_at,approved_at) VALUES (?,?,1,'active',date('now'),?,?,?)",
+        versionId,
+        templateId,
+        "Great Lakes Moving Totes rental agreement",
+        now,
+        now,
+      );
+      template = { id: templateId, version: 1 };
+    }
     if (template) {
       const agreementId = id("agr"),
         number = `GLMT-AGR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
         signature =
-          typeof input.customerSignature === "string"
-            ? input.customerSignature
+          typeof input.signature === "string"
+            ? input.signature
             : typeof customer?.name === "string"
               ? customer.name
               : "Customer",
