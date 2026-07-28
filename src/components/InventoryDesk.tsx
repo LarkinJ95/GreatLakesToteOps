@@ -78,7 +78,7 @@ export function InventoryDesk() {
         ? `${asset.asset_number} received into clean inventory.`
         : (p?.message ?? p?.error?.message ?? "Scan failed"),
     );
-    if (r.ok) await load();
+    if (r.ok) void load();
   }
   return (
     <main className="desk">
@@ -143,7 +143,9 @@ export function InventoryDesk() {
             {assets.map((a) => (
               <article key={a.id}>
                 <div>
-                  <strong>{a.asset_number}</strong>
+                  <a className="record-link" href={`/inventory/${a.id}`}>
+                    {a.asset_number}
+                  </a>
                   <span>
                     {a.asset_type.replaceAll("_", " ")} ·{" "}
                     {a.color || "No color"}
