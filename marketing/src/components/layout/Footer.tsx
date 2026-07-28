@@ -79,7 +79,10 @@ export function Footer() {
       <div className="border-t border-white/10 py-6">
         <div className="container-site flex flex-col items-center justify-between gap-2 text-center text-xs text-navy-200 sm:flex-row sm:text-left">
           <p>© {new Date().getFullYear()} {site.legalName}. All rights reserved.</p>
-          <p>Equipment rental only — we do not transport customer belongings.</p>
+          <div className="flex items-center gap-3">
+            <p>Equipment rental only — we do not transport customer belongings.</p>
+            <a href="/login" className="font-semibold text-navy-100 hover:text-white">Staff login</a>
+          </div>
         </div>
       </div>
     </footer>
