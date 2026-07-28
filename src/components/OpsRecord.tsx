@@ -86,9 +86,19 @@ export function OpsRecord({
               {String(c.primary_phone ?? "No phone")}
             </span>
           </div>
-          <a className="primary" href={`/orders?customer=${id}`}>
-            New order
-          </a>
+          <div className="record-actions">
+            <button
+              className="secondary"
+              onClick={() =>
+                window.dispatchEvent(new Event("open-customer-editor"))
+              }
+            >
+              Edit customer
+            </button>
+            <a className="primary" href={`/orders?customer=${id}`}>
+              New order
+            </a>
+          </div>
         </header>
         <div className="record-kpis">
           <article>
@@ -215,31 +225,31 @@ export function OpsRecord({
             className="record-form"
             onSubmit={(e) => void action("pricing", e)}
           >
-          <label>
-            Access fee (USD)
+            <label>
+              Access fee (USD)
               <input
                 name="accessFeeCents"
                 type="number"
                 min="0"
-              defaultValue={String(Number(o.access_fee_cents ?? 0) / 100)}
+                defaultValue={String(Number(o.access_fee_cents ?? 0) / 100)}
               />
             </label>
             <label>
-            Add-ons (USD)
+              Add-ons (USD)
               <input
                 name="addOnCents"
                 type="number"
                 min="0"
-              defaultValue={String(Number(o.add_on_cents ?? 0) / 100)}
+                defaultValue={String(Number(o.add_on_cents ?? 0) / 100)}
               />
             </label>
             <label>
-            Discount (USD)
+              Discount (USD)
               <input
                 name="discountCents"
                 type="number"
                 min="0"
-              defaultValue={String(Number(o.discount_cents ?? 0) / 100)}
+                defaultValue={String(Number(o.discount_cents ?? 0) / 100)}
               />
             </label>
             <label>
@@ -272,11 +282,11 @@ export function OpsRecord({
                 <textarea name="reason" required />
               </label>
               <label>
-              Cancellation fee (USD)
+                Cancellation fee (USD)
                 <input name="feeCents" type="number" min="0" defaultValue="0" />
               </label>
               <label>
-              Refund approved (USD)
+                Refund approved (USD)
                 <input
                   name="refundCents"
                   type="number"
