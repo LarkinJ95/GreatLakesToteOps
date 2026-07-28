@@ -5,7 +5,19 @@ const money = (n: unknown) =>
     Number(n ?? 0) / 100,
   );
 const words = (v: unknown) => String(v ?? "").replaceAll("_", " ");
-const date = (v: unknown) => (v ? new Date(String(v)).toLocaleString() : "—");
+// D1 date columns are calendar dates, not UTC instants. Formatting them as a
+// Date object shifts Michigan bookings into the previous evening.
+const date = (v: unknown) => {
+  if (!v) return "—";
+  const raw = String(v);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw))
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(`${raw}T12:00:00`));
+  return new Date(raw).toLocaleString();
+};
 type Row = Record<string, unknown>;
 type Data = Record<string, unknown>;
 export function OpsRecord({
@@ -212,8 +224,17 @@ export function OpsRecord({
     invoices = (data.invoices ?? []) as Row[],
     agreements = (data.agreements ?? []) as Row[],
     history = (data.statusHistory ?? []) as Row[],
-    cancellation = data.cancellation as Row | null;
+    cancellation = data.cancellation as Row | null,
+    equipmentAvailability = (data.equipmentAvailability ?? []) as Row[];
   const bins = (data.bins ?? []) as Row[];
+  const equipment = [
+    { type: "tote", label: "Totes", required: Number(o.package_tote_quantity ?? 0) },
+    { type: "dolly", label: "Dollies", required: Number(o.package_dolly_quantity ?? 0) },
+  ].map((requirement) => {
+    const availability = equipmentAvailability.find((row) => String(row.asset_type) === requirement.type);
+    const assigned = assets.filter((asset) => String(asset.asset_type) === requirement.type).length;
+    return { ...requirement, assigned, stillNeeded: Math.max(0, requirement.required - assigned), cleanAvailable: Number(availability?.clean_available_count ?? 0) };
+  });
   return (
     <main className="record">
       <a href={`/customers/${String(o.customer_id)}`} className="back">
@@ -238,10 +259,12 @@ export function OpsRecord({
         <article>
           <span>Delivery</span>
           <strong>{date(o.scheduled_delivery_date)}</strong>
+          <small>{String(o.preferred_delivery_window ?? "Time not selected")}</small>
         </article>
         <article>
           <span>Pickup</span>
           <strong>{date(o.scheduled_pickup_date)}</strong>
+          <small>{String(o.preferred_pickup_window ?? "Time not selected")}</small>
         </article>
       </div>
       <section className="record-editor">
@@ -251,6 +274,9 @@ export function OpsRecord({
             <strong>Delivery</strong>
             <p>
               {date(o.scheduled_delivery_date)}
+              <br />
+              <b>Requested: {String(o.preferred_delivery_window ?? "No preference")}</b>
+              {Boolean(o.confirmed_delivery_window_start || o.confirmed_delivery_window_end) && <><br />Confirmed: {String(o.confirmed_delivery_window_start ?? "—")}–{String(o.confirmed_delivery_window_end ?? "—")}</>}
               <br />
               {String(o.delivery_street ?? "Address to be confirmed")}
               {o.delivery_unit ? `, ${String(o.delivery_unit)}` : ""}
@@ -263,6 +289,9 @@ export function OpsRecord({
             <strong>Pickup</strong>
             <p>
               {date(o.scheduled_pickup_date)}
+              <br />
+              <b>Requested: {String(o.preferred_pickup_window ?? "No preference")}</b>
+              {Boolean(o.confirmed_pickup_window_start || o.confirmed_pickup_window_end) && <><br />Confirmed: {String(o.confirmed_pickup_window_start ?? "—")}–{String(o.confirmed_pickup_window_end ?? "—")}</>}
               <br />
               {String(o.pickup_street ?? "Address to be confirmed")}
               {o.pickup_unit ? `, ${String(o.pickup_unit)}` : ""}
@@ -277,6 +306,16 @@ export function OpsRecord({
               {String(
                 o.customer_notes ?? "No customer access or time-window notes.",
               )}
+            </p>
+          </div>
+          <div>
+            <strong>Selected package</strong>
+            <p>
+              <b>{String(o.package_name ?? "No package selected")}</b>
+              <br />
+              {String(o.package_description ?? "Package details unavailable.")}
+              <br />
+              {Number(o.package_tote_quantity ?? 0)} totes · {Number(o.package_dolly_quantity ?? 0)} dollies · {Number(o.package_included_rental_days ?? 0)} included rental days
             </p>
           </div>
         </div>
@@ -304,6 +343,28 @@ export function OpsRecord({
                 )}
               />
             </label>
+          </div>
+          <div className="form-pair">
+            <label>
+              Requested delivery window
+              <select name="preferredDeliveryWindow" defaultValue={String(o.preferred_delivery_window ?? "")}>
+                <option value="">No preference</option><option>Morning (8–11 AM)</option><option>Midday (11 AM–2 PM)</option><option>Afternoon (2–5 PM)</option>
+              </select>
+            </label>
+            <label>
+              Requested pickup window
+              <select name="preferredPickupWindow" defaultValue={String(o.preferred_pickup_window ?? "")}>
+                <option value="">No preference</option><option>Morning (8–11 AM)</option><option>Midday (11 AM–2 PM)</option><option>Afternoon (2–5 PM)</option>
+              </select>
+            </label>
+          </div>
+          <div className="form-pair">
+            <label>Confirmed delivery start<input name="confirmedDeliveryWindowStart" type="time" defaultValue={String(o.confirmed_delivery_window_start ?? "")} /></label>
+            <label>Confirmed delivery end<input name="confirmedDeliveryWindowEnd" type="time" defaultValue={String(o.confirmed_delivery_window_end ?? "")} /></label>
+          </div>
+          <div className="form-pair">
+            <label>Confirmed pickup start<input name="confirmedPickupWindowStart" type="time" defaultValue={String(o.confirmed_pickup_window_start ?? "")} /></label>
+            <label>Confirmed pickup end<input name="confirmedPickupWindowEnd" type="time" defaultValue={String(o.confirmed_pickup_window_end ?? "")} /></label>
           </div>
           <label>
             Delivery street
@@ -364,6 +425,27 @@ export function OpsRecord({
         </form>
       </section>
       <div className="record-grid">
+        <section>
+          <div className="section-heading">
+            <div>
+              <h2>Package pick list</h2>
+              <p className="empty">{String(o.package_name ?? "No package selected")} · stage this equipment for delivery.</p>
+            </div>
+            <button type="button" className="secondary no-print" onClick={() => window.print()}>
+              Print pick list
+            </button>
+          </div>
+          {equipment.map((item) => (
+            <div className="record-row" key={item.type}>
+              <div>
+                <strong>{item.label}</strong>
+                <span>{item.required} required · {item.assigned} assigned · {item.cleanAvailable} clean and available</span>
+              </div>
+              <b>{item.stillNeeded ? `${item.stillNeeded} to assign` : "Ready"}</b>
+            </div>
+          ))}
+          {assets.length ? <p className="desk-hint">Assigned assets are listed in Dispatch & equipment below.</p> : <p className="desk-hint">No serialized equipment has been assigned yet. Reserve the package inventory before staging.</p>}
+        </section>
         <section>
           <h2>Pricing & discount</h2>
           <form

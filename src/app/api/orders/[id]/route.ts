@@ -17,7 +17,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       orderId = (await context.params).id;
     const order = await one(
       env.DB,
-      `SELECT o.*,p.name AS package_name,COALESCE(c.business_name,trim(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,''))) AS customer_name,c.customer_number,c.email,c.primary_phone,da.street delivery_street,da.unit delivery_unit,da.city delivery_city,da.state delivery_state,da.zip delivery_zip,da.delivery_notes delivery_notes,pa.street pickup_street,pa.unit pickup_unit,pa.city pickup_city,pa.state pickup_state,pa.zip pickup_zip,pa.delivery_notes pickup_notes FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN rental_packages p ON p.id=o.package_id LEFT JOIN customer_addresses da ON da.id=o.delivery_address_id LEFT JOIN customer_addresses pa ON pa.id=o.pickup_address_id WHERE o.id=? AND o.deleted_at IS NULL`,
+      `SELECT o.*,p.name AS package_name,p.description AS package_description,p.tote_quantity AS package_tote_quantity,p.dolly_quantity AS package_dolly_quantity,p.included_rental_days AS package_included_rental_days,COALESCE(c.business_name,trim(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,''))) AS customer_name,c.customer_number,c.email,c.primary_phone,da.street delivery_street,da.unit delivery_unit,da.city delivery_city,da.state delivery_state,da.zip delivery_zip,da.delivery_notes delivery_notes,pa.street pickup_street,pa.unit pickup_unit,pa.city pickup_city,pa.state pickup_state,pa.zip pickup_zip,pa.delivery_notes pickup_notes FROM orders o JOIN customers c ON c.id=o.customer_id LEFT JOIN rental_packages p ON p.id=o.package_id LEFT JOIN customer_addresses da ON da.id=o.delivery_address_id LEFT JOIN customer_addresses pa ON pa.id=o.pickup_address_id WHERE o.id=? AND o.deleted_at IS NULL`,
       orderId,
     );
     if (!order) throw new NotFoundError("Order");
@@ -29,6 +29,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       statusHistory,
       cancellation,
       bins,
+      equipmentAvailability,
     ] = await Promise.all([
       q(
         env.DB,
@@ -65,6 +66,11 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
         "SELECT b.id,b.code,l.code location_code,ba.purpose,ba.notes FROM bin_assignments ba JOIN warehouse_bins b ON b.id=ba.bin_id JOIN storage_locations l ON l.id=b.storage_location_id WHERE ba.order_id=? AND ba.status='active' ORDER BY ba.assigned_at DESC",
         orderId,
       ),
+      q(
+        env.DB,
+        "SELECT asset_type,COUNT(*) AS total_count,SUM(CASE WHEN current_status='clean_inventory' THEN 1 ELSE 0 END) AS clean_available_count,SUM(CASE WHEN current_order_id=? THEN 1 ELSE 0 END) AS allocated_to_order_count FROM assets WHERE deleted_at IS NULL AND asset_type IN ('tote','dolly') GROUP BY asset_type",
+        orderId,
+      ),
     ]);
     return Response.json({
       order,
@@ -75,6 +81,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       statusHistory,
       cancellation,
       bins,
+      equipmentAvailability,
     });
   },
 );
@@ -98,17 +105,29 @@ export const PATCH = withErrorHandling<{ params: Promise<{ id: string }> }>(
     if (!order) throw new NotFoundError("Order");
     const deliveryDate = optionalString(body.deliveryDate, "deliveryDate", 10),
       pickupDate = optionalString(body.pickupDate, "pickupDate", 10),
-      notes = optionalString(body.customerNotes, "customerNotes", 4000);
+      notes = optionalString(body.customerNotes, "customerNotes", 4000),
+      preferredDeliveryWindow = optionalString(body.preferredDeliveryWindow, "preferredDeliveryWindow", 100),
+      preferredPickupWindow = optionalString(body.preferredPickupWindow, "preferredPickupWindow", 100),
+      confirmedDeliveryWindowStart = optionalString(body.confirmedDeliveryWindowStart, "confirmedDeliveryWindowStart", 20),
+      confirmedDeliveryWindowEnd = optionalString(body.confirmedDeliveryWindowEnd, "confirmedDeliveryWindowEnd", 20),
+      confirmedPickupWindowStart = optionalString(body.confirmedPickupWindowStart, "confirmedPickupWindowStart", 20),
+      confirmedPickupWindowEnd = optionalString(body.confirmedPickupWindowEnd, "confirmedPickupWindowEnd", 20);
     if (deliveryDate && pickupDate && pickupDate < deliveryDate)
       throw new ValidationError(
         "Pickup date must be on or after delivery date",
       );
     await run(
       env.DB,
-      "UPDATE orders SET scheduled_delivery_date=COALESCE(?,scheduled_delivery_date),scheduled_pickup_date=COALESCE(?,scheduled_pickup_date),customer_notes=COALESCE(?,customer_notes),updated_at=?,version=version+1 WHERE id=?",
+      "UPDATE orders SET scheduled_delivery_date=COALESCE(?,scheduled_delivery_date),scheduled_pickup_date=COALESCE(?,scheduled_pickup_date),customer_notes=COALESCE(?,customer_notes),preferred_delivery_window=COALESCE(?,preferred_delivery_window),preferred_pickup_window=COALESCE(?,preferred_pickup_window),confirmed_delivery_window_start=COALESCE(?,confirmed_delivery_window_start),confirmed_delivery_window_end=COALESCE(?,confirmed_delivery_window_end),confirmed_pickup_window_start=COALESCE(?,confirmed_pickup_window_start),confirmed_pickup_window_end=COALESCE(?,confirmed_pickup_window_end),updated_at=?,version=version+1 WHERE id=?",
       deliveryDate,
       pickupDate,
       notes,
+      preferredDeliveryWindow,
+      preferredPickupWindow,
+      confirmedDeliveryWindowStart,
+      confirmedDeliveryWindowEnd,
+      confirmedPickupWindowStart,
+      confirmedPickupWindowEnd,
       nowIso(),
       orderId,
     );
@@ -142,7 +161,7 @@ export const PATCH = withErrorHandling<{ params: Promise<{ id: string }> }>(
       action: "order.schedule_updated",
       entityType: "order",
       entityId: orderId,
-      detail: { deliveryDate, pickupDate },
+      detail: { deliveryDate, pickupDate, preferredDeliveryWindow, preferredPickupWindow, confirmedDeliveryWindowStart, confirmedDeliveryWindowEnd, confirmedPickupWindowStart, confirmedPickupWindowEnd },
       ip: ctx.ip,
     });
     return Response.json({ ok: true });
