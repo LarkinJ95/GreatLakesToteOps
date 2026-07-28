@@ -101,10 +101,9 @@ export function OpsRecord({
     }
   }
   async function loadAllStagedAssets() {
-    if (!window.confirm("Load every staged item assigned to this order?")) return;
     setSaving(true);
     setError("");
-    setNotice("");
+    setNotice("Loading staged equipment…");
     try {
       const r = await fetch(`/api/orders/${id}/load`, { method: "POST" });
       const p = (await r.json().catch(() => null)) as {
@@ -130,8 +129,7 @@ export function OpsRecord({
     }
   }
   async function stageAllReservedAssets() {
-    if (!window.confirm("Stage every reserved item assigned to this order?")) return;
-    setSaving(true); setError(""); setNotice("");
+    setSaving(true); setError(""); setNotice("Staging reserved equipment…");
     try {
       const r = await fetch(`/api/orders/${id}/stage`, { method: "POST" });
       const p = (await r.json().catch(() => null)) as { staged?: string[]; failed?: unknown[]; error?: { message?: string } } | null;
@@ -619,11 +617,11 @@ export function OpsRecord({
           <div className="section-heading">
             <h2>Dispatch & equipment</h2>
             <div className="record-actions">
-              <button type="button" className="secondary" disabled={saving || !assets.some((asset) => String(asset.current_status) === "reserved")} onClick={() => void stageAllReservedAssets()}>
-                Stage all reserved items
+              <button type="button" className="secondary" disabled={saving} onClick={() => void stageAllReservedAssets()}>
+                {saving ? "Working…" : "Stage all reserved items"}
               </button>
-              <button type="button" className="primary" disabled={saving || !assets.some((asset) => String(asset.current_status) === "staged")} onClick={() => void loadAllStagedAssets()}>
-                Load all staged items
+              <button type="button" className="primary" disabled={saving} onClick={() => void loadAllStagedAssets()}>
+                {saving ? "Working…" : "Load all staged items"}
               </button>
             </div>
           </div>
