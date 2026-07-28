@@ -12,7 +12,7 @@ export const site = {
   email: 'hello@greatlakesmovingtotes.com',
   emailHref: 'mailto:hello@greatlakesmovingtotes.com',
   hours: 'Mon–Sat, 8:00 AM – 6:00 PM ET',
-  portalUrl: '/login',
+  portalUrl: '/portal',
   region: 'Great Lakes Bay Region, Michigan',
 } as const;
 
