@@ -18,10 +18,12 @@ type Customer = {
   last_name: string | null;
   business_name: string | null;
 };
+type Location = { id: string; code: string; name: string };
 export function BinDesk() {
   const [bins, setBins] = useState<Bin[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
     [customers, setCustomers] = useState<Customer[]>([]),
+    [locations, setLocations] = useState<Location[]>([]),
     [message, setMessage] = useState("");
   const load = async () => {
     const [b, o, c] = await Promise.all([
@@ -29,7 +31,11 @@ export function BinDesk() {
       fetch("/api/orders"),
       fetch("/api/customers"),
     ]);
-    if (b.ok) setBins(((await b.json()) as { bins: Bin[] }).bins);
+    if (b.ok) {
+      const data = (await b.json()) as { bins: Bin[]; locations: Location[] };
+      setBins(data.bins);
+      setLocations(data.locations);
+    }
     if (o.ok) setOrders(((await o.json()) as { orders: Order[] }).orders);
     if (c.ok)
       setCustomers(((await c.json()) as { customers: Customer[] }).customers);
@@ -47,6 +53,21 @@ export function BinDesk() {
       });
     setMessage(r.ok ? "Bin assignment saved." : "Could not assign that bin.");
     if (r.ok) void load();
+  }
+  async function create(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const r = await fetch("/api/bins", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(f)),
+    });
+    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+    setMessage(r.ok ? "Bin created and ready to assign." : (p?.error?.message ?? "Could not create bin."));
+    if (r.ok) {
+      e.currentTarget.reset();
+      void load();
+    }
   }
   return (
     <main className="desk">
@@ -112,7 +133,30 @@ export function BinDesk() {
           <button className="primary">Save bin assignment</button>
           {message && <p className="desk-hint">{message}</p>}
         </form>
-        <section className="order-list">
+        <div className="record-grid">
+          <form className="create-order" onSubmit={create}>
+            <p className="eyebrow">CREATE BIN</p>
+            <h2>Add a physical bin</h2>
+            <label>
+              Warehouse location
+              <select name="storageLocationId" required>
+                <option value="">Choose location</option>
+                {locations.map((location) => <option value={location.id} key={location.id}>{location.code} · {location.name}</option>)}
+              </select>
+            </label>
+            <label>Bin code<input name="code" placeholder="A-01" required /></label>
+            <label>Label<input name="label" placeholder="Clean tote shelf A-01" /></label>
+            <label>
+              Bin type
+              <select name="binType" defaultValue="general">
+                <option value="general">General</option><option value="staging">Staging</option><option value="customer_hold">Customer hold</option><option value="returns">Returns</option><option value="repair">Repair</option><option value="quarantine">Quarantine</option>
+              </select>
+            </label>
+            <label>Notes<textarea name="notes" /></label>
+            <button className="secondary">Create bin</button>
+            <p className="desk-hint">Bins are physical locations. Create them here first; then they appear in the assignment dropdown.</p>
+          </form>
+          <section className="order-list">
           <p className="eyebrow">BIN MAP</p>
           <h2>Active bins</h2>
           <div className="orders-table">
@@ -146,7 +190,8 @@ export function BinDesk() {
               </article>
             ))}
           </div>
-        </section>
+          </section>
+        </div>
       </section>
     </main>
   );

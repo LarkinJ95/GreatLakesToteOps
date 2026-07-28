@@ -39,6 +39,7 @@ export function InventoryDesk() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         assetType: f.get("assetType"),
+        quantity: Number(f.get("quantity")),
         replacementCostCents: Math.round(
           Number(f.get("replacementCostUsd")) * 100,
         ),
@@ -46,11 +47,13 @@ export function InventoryDesk() {
       }),
     });
     const p = (await r.json().catch(() => null)) as {
+      quantity?: number;
       error?: { message?: string };
     } | null;
     if (!r.ok) setError(p?.error?.message ?? "Asset could not be added");
     else {
       e.currentTarget.reset();
+      setStatus(`${p?.quantity ?? 1} asset${p?.quantity === 1 ? "" : "s"} added. Receive them into clean inventory when ready.`);
       void load();
     }
     setSaving(false);
@@ -110,6 +113,10 @@ export function InventoryDesk() {
             </select>
           </label>
           <label>
+            Quantity
+            <input name="quantity" type="number" min="1" max="100" step="1" defaultValue="1" required />
+          </label>
+          <label>
             Replacement value (USD)
             <input
               name="replacementCostUsd"
@@ -126,7 +133,7 @@ export function InventoryDesk() {
           </label>
           {error && <p className="form-error">{error}</p>}
           <button className="primary" disabled={saving}>
-            {saving ? "Adding…" : "Add asset"}
+            {saving ? "Adding…" : "Add assets"}
           </button>
           <p className="desk-hint">
             New assets must be received before they can be reserved or scanned

@@ -13,7 +13,11 @@ export const GET = withErrorHandling(async (request) => {
     env.DB,
     `SELECT b.*,l.name location_name,l.code location_code,ba.id assignment_id,ba.customer_id,ba.order_id,ba.purpose,COALESCE(o.order_number,'') order_number,COALESCE(c.business_name,trim(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,''))) customer_name FROM warehouse_bins b JOIN storage_locations l ON l.id=b.storage_location_id LEFT JOIN bin_assignments ba ON ba.bin_id=b.id AND ba.status='active' LEFT JOIN orders o ON o.id=ba.order_id LEFT JOIN customers c ON c.id=ba.customer_id WHERE b.active=1 ORDER BY l.code,b.code`,
   );
-  return Response.json({ bins });
+  const locations = await q(
+    env.DB,
+    "SELECT id,name,code FROM storage_locations WHERE active=1 ORDER BY code",
+  );
+  return Response.json({ bins, locations });
 });
 export const POST = withErrorHandling(async (request) => {
   const ctx = await requireUser(request);

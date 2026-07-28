@@ -2,17 +2,21 @@
 import { useEffect, useState } from "react";
 type Row = Record<string, unknown>;
 export function AgreementWorkspace({ id }: { id: string }) {
-  const [a, setA] = useState<Row | null>(null);
+  const [a, setA] = useState<Row | null>(null), [error, setError] = useState("");
   useEffect(() => {
-    fetch(`/api/agreements/${id}`).then(
-      async (r) =>
-        r.ok && setA(((await r.json()) as { agreement: Row }).agreement),
-    );
+    void fetch(`/api/agreements/${id}`).then(async (r) => {
+      if (!r.ok) {
+        const body = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+        setError(body?.error?.message ?? "This agreement could not be loaded.");
+        return;
+      }
+      setA(((await r.json()) as { agreement: Row }).agreement);
+    }).catch(() => setError("This agreement could not be loaded."));
   }, [id]);
   if (!a)
     return (
       <main className="record">
-        <p>Loading agreement…</p>
+        <p>{error || "Loading agreement…"}</p>
       </main>
     );
   return (
