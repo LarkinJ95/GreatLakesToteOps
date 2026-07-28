@@ -410,6 +410,10 @@ export async function POST(request: Request, context: Ctx) {
       deliveryAddressId: deliveryId,
       pickupAddressId: pickupId,
       salesChannel: "website",
+      preferredDeliveryWindow:
+        typeof input.deliveryWindow === "string" ? input.deliveryWindow : null,
+      preferredPickupWindow:
+        typeof input.pickupWindow === "string" ? input.pickupWindow : null,
       customerNotes: `Preferred delivery window: ${String(input.deliveryWindow ?? "")}; preferred pickup window: ${String(input.pickupWindow ?? "")}; ${String(input.access ?? "")}`,
     });
     let template = await one<{ id: string; version: number }>(
@@ -489,6 +493,7 @@ export async function POST(request: Request, context: Ctx) {
       "INSERT INTO invoices (id,invoice_number,invoice_type,customer_id,order_id,status,issue_date,due_date,service_date,subtotal_cents,tax_total_cents,total_cents,balance_due_cents,customer_billing_snapshot_json,company_snapshot_json,notes,verification_code,created_at,updated_at) VALUES (?,?,?,?,?,'finalized',date('now'),date('now','+30 days'),?,?,?,?,?,?,?,?,?,?,?,?)",
       invoiceId,
       invoiceNumber,
+      "standard",
       c.id,
       order.id,
       deliveryDate,
