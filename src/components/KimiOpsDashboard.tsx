@@ -1,5 +1,6 @@
 "use client";
 import { ReactNode, useEffect, useState } from "react";
+import { CommandSearch } from "./CommandSearch";
 
 type Dashboard = {
   date: string;
@@ -121,6 +122,7 @@ export function KimiOpsShell({
             ☰
           </button>
           <h1>{title}</h1>
+          <CommandSearch />
           <a href="/site/">View marketing site →</a>
         </header>
         {children}
