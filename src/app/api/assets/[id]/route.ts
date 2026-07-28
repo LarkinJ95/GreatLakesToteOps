@@ -2,7 +2,7 @@ import { audit } from "@/lib/audit";
 import { requirePermission, requireUser } from "@/lib/auth";
 import { getEnv } from "@/lib/cloudflare";
 import { nowIso, one, q, run } from "@/lib/db";
-import { NotFoundError, withErrorHandling } from "@/lib/errors";
+import { NotFoundError, ValidationError, withErrorHandling } from "@/lib/errors";
 import { jsonBody, optionalString } from "@/lib/http";
 
 const assetSql =
@@ -67,4 +67,44 @@ export const PATCH = withErrorHandling(async (request) => {
     ip: ctx.ip,
   });
   return Response.json({ asset: await one(env.DB, assetSql, id) });
+});
+
+/** Soft-delete only never-used new assets; operational history must remain auditable. */
+export const DELETE = withErrorHandling(async (request) => {
+  const ctx = await requireUser(request);
+  requirePermission(ctx, "assets.manage");
+  const env = await getEnv();
+  const id = new URL(request.url).pathname.split("/").pop()!;
+  const asset = await one<{ id: string; asset_number: string; current_status: string }>(
+    env.DB,
+    "SELECT id,asset_number,current_status FROM assets WHERE id=? AND deleted_at IS NULL",
+    id,
+  );
+  if (!asset) throw new NotFoundError("Asset not found");
+  const used = await one<{ n: number }>(
+    env.DB,
+    "SELECT (SELECT COUNT(*) FROM order_assets WHERE asset_id=?) + (SELECT COUNT(*) FROM asset_scan_events WHERE asset_id=?) AS n",
+    id,
+    id,
+  );
+  if (asset.current_status !== "new" || (used?.n ?? 0) > 0)
+    throw new ValidationError(
+      "Only unused new assets can be deleted. Retire equipment with operational history instead.",
+    );
+  await run(
+    env.DB,
+    "UPDATE assets SET deleted_at=?,updated_at=?,version=version+1 WHERE id=?",
+    nowIso(),
+    nowIso(),
+    id,
+  );
+  await audit(env.DB, {
+    actorUserId: ctx.user.id,
+    action: "asset.deleted",
+    entityType: "asset",
+    entityId: id,
+    detail: { assetNumber: asset.asset_number },
+    ip: ctx.ip,
+  });
+  return Response.json({ ok: true });
 });

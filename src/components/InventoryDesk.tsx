@@ -90,6 +90,17 @@ export function InventoryDesk() {
     );
     if (r.ok) void load();
   }
+  async function remove(asset: Asset) {
+    if (!window.confirm(`Delete ${asset.asset_number}? This is only available before the asset is received or used.`)) return;
+    setError("");
+    const r = await fetch(`/api/assets/${asset.id}`, { method: "DELETE" });
+    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+    if (!r.ok) setError(p?.error?.message ?? "Asset could not be deleted");
+    else {
+      setStatus(`${asset.asset_number} deleted.`);
+      await load();
+    }
+  }
   return (
     <main className="desk">
       <header className="desk-header">
@@ -170,9 +181,7 @@ export function InventoryDesk() {
                   <b>{money(a.replacement_cost_cents)}</b>
                 </div>
                 {a.current_status === "new" ? (
-                  <button className="secondary" onClick={() => void receive(a)}>
-                    Receive
-                  </button>
+                  <div className="record-actions"><button className="secondary" onClick={() => void receive(a)}>Receive</button><button className="danger" onClick={() => void remove(a)}>Delete</button></div>
                 ) : (
                   <em>{a.current_status.replaceAll("_", " ")}</em>
                 )}

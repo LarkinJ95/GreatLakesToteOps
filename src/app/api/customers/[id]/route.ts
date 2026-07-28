@@ -25,3 +25,16 @@ export const PATCH = withErrorHandling<{ params: Promise<{ id: string }> }>(asyn
   await run(env.DB, "UPDATE customers SET primary_phone=?,email=?,notes=?,updated_at=? WHERE id=?", values.phone, values.email, values.notes, nowIso(), customerId);
   await audit(env.DB, { actorUserId: ctx.user.id, action: "customer.updated", entityType: "customer", entityId: customerId, detail: { fields: Object.keys(values) }, ip: ctx.ip }); return Response.json({ ok: true });
 });
+
+/** Preserve accounting and rental history: only empty customer records can be removed. */
+export const DELETE = withErrorHandling<{ params: Promise<{ id: string }> }>(async (request, context) => {
+  const ctx = await requireUser(request); requirePermission(ctx, "customers.delete");
+  const env = await getEnv(), customerId = (await context.params).id;
+  const customer = await one<{ id: string; customer_number: string }>(env.DB, "SELECT id,customer_number FROM customers WHERE id=? AND deleted_at IS NULL", customerId);
+  if (!customer) throw new NotFoundError("Customer");
+  const usage = await one<{ n: number }>(env.DB, "SELECT (SELECT COUNT(*) FROM orders WHERE customer_id=? AND deleted_at IS NULL) + (SELECT COUNT(*) FROM invoices WHERE customer_id=?) + (SELECT COUNT(*) FROM agreements WHERE customer_id=?) AS n", customerId, customerId, customerId);
+  if ((usage?.n ?? 0) > 0) throw new ValidationError("Customers with orders, invoices, or agreements cannot be deleted. Keep the record for its audit history.");
+  await run(env.DB, "UPDATE customers SET deleted_at=?,updated_at=? WHERE id=?", nowIso(), nowIso(), customerId);
+  await audit(env.DB, { actorUserId: ctx.user.id, action: "customer.deleted", entityType: "customer", entityId: customerId, detail: { customerNumber: customer.customer_number }, ip: ctx.ip });
+  return Response.json({ ok: true });
+});

@@ -167,3 +167,18 @@ export const PATCH = withErrorHandling<{ params: Promise<{ id: string }> }>(
     return Response.json({ ok: true });
   },
 );
+
+/** Soft-delete only uncommitted orders; operational and billing records are never erased. */
+export const DELETE = withErrorHandling<{ params: Promise<{ id: string }> }>(
+  async (request, context) => {
+    const ctx = await requireUser(request); requirePermission(ctx, "orders.edit");
+    const env = await getEnv(), orderId = (await context.params).id;
+    const order = await one<{ id: string; order_number: string }>(env.DB, "SELECT id,order_number FROM orders WHERE id=? AND deleted_at IS NULL", orderId);
+    if (!order) throw new NotFoundError("Order");
+    const usage = await one<{ n: number }>(env.DB, "SELECT (SELECT COUNT(*) FROM invoices WHERE order_id=?) + (SELECT COUNT(*) FROM agreements WHERE order_id=?) + (SELECT COUNT(*) FROM payments WHERE order_id=?) + (SELECT COUNT(*) FROM order_assets WHERE order_id=?) AS n", orderId, orderId, orderId, orderId);
+    if ((usage?.n ?? 0) > 0) throw new ValidationError("Orders with billing, agreements, payments, or assigned equipment cannot be deleted. Cancel the order to retain its audit history.");
+    await run(env.DB, "UPDATE orders SET deleted_at=?,updated_at=?,version=version+1 WHERE id=?", nowIso(), nowIso(), orderId);
+    await audit(env.DB, { actorUserId: ctx.user.id, action: "order.deleted", entityType: "order", entityId: orderId, detail: { orderNumber: order.order_number }, ip: ctx.ip });
+    return Response.json({ ok: true });
+  },
+);

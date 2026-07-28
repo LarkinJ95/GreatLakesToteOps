@@ -80,6 +80,25 @@ export function OpsRecord({
     else void load();
     setSaving(false);
   }
+  async function removeRecord() {
+    const label = kind === "customer" ? "customer" : "order";
+    if (!window.confirm(`Delete this ${label}? This is only available for records without operational or billing history.`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      const r = await fetch(base, { method: "DELETE" });
+      const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+      if (!r.ok) {
+        setError(p?.error?.message ?? `This ${label} could not be deleted.`);
+        return;
+      }
+      window.location.assign(kind === "customer" ? "/customers" : "/orders");
+    } catch {
+      setError(`This ${label} could not be deleted.`);
+    } finally {
+      setSaving(false);
+    }
+  }
   if (!data)
     return (
       <main className="record">
@@ -123,6 +142,9 @@ export function OpsRecord({
             <a className="primary" href={`/orders?customer=${id}`}>
               New order
             </a>
+            <button className="danger" onClick={() => void removeRecord()} disabled={saving}>
+              Delete customer
+            </button>
           </div>
         </header>
         <div className="record-kpis">
@@ -248,6 +270,11 @@ export function OpsRecord({
             {String(o.package_name ?? "Tote rental")} · {words(o.order_status)}{" "}
             · {money(o.total_cents)}
           </span>
+        </div>
+        <div className="record-actions">
+          <button className="danger" onClick={() => void removeRecord()} disabled={saving}>
+            Delete order
+          </button>
         </div>
       </header>
       {error && <p className="form-error">{error}</p>}

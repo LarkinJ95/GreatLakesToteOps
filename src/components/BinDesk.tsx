@@ -76,6 +76,17 @@ export function BinDesk() {
       setMessage("The bin was created, but the screen could not refresh. Reload to view it.");
     }
   }
+  async function remove(bin: Bin) {
+    if (!window.confirm(`Delete bin ${bin.location_code} · ${bin.code}?`)) return;
+    const r = await fetch("/api/bins", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ binId: bin.id }),
+    });
+    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+    setMessage(r.ok ? `Bin ${bin.code} deleted.` : (p?.error?.message ?? "Bin could not be deleted."));
+    if (r.ok) await load();
+  }
   return (
     <main className="desk">
       <header className="desk-header">
@@ -192,7 +203,7 @@ export function BinDesk() {
                     Open customer
                   </a>
                 ) : (
-                  <em>Available</em>
+                  <button className="danger" onClick={() => void remove(b)}>Delete</button>
                 )}
               </article>
             ))}

@@ -104,3 +104,34 @@ export const PATCH = withErrorHandling(async (request) => {
   });
   return Response.json({ id: assignmentId });
 });
+
+/** Archive an empty bin. Bins with active holds must be released first. */
+export const DELETE = withErrorHandling(async (request) => {
+  const ctx = await requireUser(request);
+  requirePermission(ctx, "assets.manage");
+  const env = await getEnv(), body = await jsonBody<Record<string, unknown>>(request);
+  const binId = requiredString(body.binId, "binId", 100);
+  const activeAssignment = await q<{ id: string }>(
+    env.DB,
+    "SELECT id FROM bin_assignments WHERE bin_id=? AND status='active' LIMIT 1",
+    binId,
+  );
+  if (activeAssignment.length)
+    throw new ValidationError("Release this bin's active customer or order hold before deleting it");
+  const result = await run(
+    env.DB,
+    "UPDATE warehouse_bins SET active=0,updated_at=? WHERE id=? AND active=1",
+    nowIso(),
+    binId,
+  );
+  if ((result.meta.changes ?? 0) === 0) throw new ValidationError("Bin was not found or is already deleted");
+  await audit(env.DB, {
+    actorUserId: ctx.user.id,
+    action: "bin.deleted",
+    entityType: "bin",
+    entityId: binId,
+    detail: {},
+    ip: ctx.ip,
+  });
+  return Response.json({ ok: true });
+});
