@@ -1,5 +1,5 @@
 // Asset state machine + scan event processing. Clients never write asset status directly.
-import { id, nowIso, one, q, run, type Db } from "../db";
+import { id, nowIso, one, q, run, stmt, type Db } from "../db";
 import { NotFoundError, ValidationError } from "../errors";
 import type { AssetRow, AssetStatus, ScanMode } from "../types";
 
@@ -93,9 +93,18 @@ export async function processScan(db: Db, input: ScanInput): Promise<ScanResult>
     return { ok: false, warningCode: "invalid_asset", message: `Unknown asset: ${input.assetIdentifier}` };
   }
 
+  // A QR label is normally opened outside an order screen. When the asset is
+  // currently allocated, keep its operational scan attached to that order so
+  // delivery, pickup, and return timestamps remain in sync with the order.
+  const scanInput: ScanInput = {
+    ...input,
+    orderId: input.orderId ?? asset.current_order_id,
+    assignmentId: input.assignmentId ?? asset.current_assignment_id,
+  };
+
   // Wrong-order check (warn but still record when modes tie to an order)
-  if (input.orderId && asset.current_order_id && asset.current_order_id !== input.orderId
-      && ["stage", "load", "deliver", "pickup"].includes(input.mode)) {
+  if (scanInput.orderId && asset.current_order_id && asset.current_order_id !== scanInput.orderId
+      && ["stage", "load", "deliver", "pickup"].includes(scanInput.mode)) {
     return {
       ok: false, warningCode: "wrong_order",
       message: `${asset.asset_number} belongs to a different order`,
@@ -103,49 +112,52 @@ export async function processScan(db: Db, input: ScanInput): Promise<ScanResult>
     };
   }
 
-  const rule = MODE_TRANSITIONS[input.mode];
+  const rule = MODE_TRANSITIONS[scanInput.mode];
   let targetStatus: AssetStatus;
-  if (input.mode === "audit") {
+  if (scanInput.mode === "audit") {
     targetStatus = asset.current_status; // event-only
-  } else if (input.mode === "inspect" && input.outcome) {
-    targetStatus = INSPECT_OUTCOMES[input.outcome] ?? rule.to;
+  } else if (scanInput.mode === "inspect" && scanInput.outcome) {
+    targetStatus = INSPECT_OUTCOMES[scanInput.outcome] ?? rule.to;
   } else {
     targetStatus = rule.to;
   }
 
-  if (input.mode !== "audit" && !rule.from.includes(asset.current_status)) {
+  if (scanInput.mode !== "audit" && !rule.from.includes(asset.current_status)) {
     // Store the rejected event for traceability, but do not change status.
-    await insertScanEvent(db, input, asset, targetStatus, "status_conflict");
+    await insertScanEvent(db, scanInput, asset, targetStatus, "status_conflict");
     return {
       ok: false, warningCode: "status_conflict",
-      message: `${asset.asset_number} is '${asset.current_status}'; cannot run '${input.mode}'`,
+      message: `${asset.asset_number} is '${asset.current_status}'; cannot run '${scanInput.mode}'`,
       assetId: asset.id, assetNumber: asset.asset_number, previousStatus: asset.current_status,
     };
   }
 
-  const scanId = await insertScanEvent(db, input, asset, targetStatus, null);
+  const scanId = await insertScanEvent(db, scanInput, asset, targetStatus, null);
   const now = nowIso();
-  const deviceTs = input.deviceTimestamp ?? now;
+  const deviceTs = scanInput.deviceTimestamp ?? now;
 
   // Apply status + contextual pointers
-  if (input.mode !== "audit" && targetStatus !== asset.current_status) {
+  if (scanInput.mode !== "audit" && targetStatus !== asset.current_status) {
     const sets: Record<string, unknown> = {
       current_status: targetStatus,
       last_scan_at: deviceTs,
     };
-    if (input.mode === "deliver") {
-      sets.current_order_id = input.orderId ?? asset.current_order_id;
+    if (scanInput.mode === "deliver") {
+      sets.current_order_id = scanInput.orderId ?? asset.current_order_id;
       sets.current_customer_id = null;
     }
-    if (input.mode === "load" && input.vehicleId) sets.current_vehicle_id = input.vehicleId;
-    if (input.mode === "unload") sets.current_vehicle_id = null;
-    if (input.mode === "warehouse_return") {
+    if (scanInput.mode === "load" && scanInput.vehicleId) sets.current_vehicle_id = scanInput.vehicleId;
+    if (scanInput.mode === "unload") sets.current_vehicle_id = null;
+    if (scanInput.mode === "warehouse_return") {
+      // Preserve the inferred order on the scan event, then release the asset
+      // from it so later warehouse scans cannot be attributed to an old rental.
       sets.current_vehicle_id = null; sets.current_assignment_id = null;
+      sets.current_order_id = null; sets.current_customer_id = null;
     }
-    if (input.mode === "retire") sets.retired_at = now;
-    if (input.mode === "clean_complete") sets.last_cleaned_at = now;
-    if (input.mode === "inspect") sets.last_inspected_at = now;
-    if (input.condition) sets.current_condition = input.condition;
+    if (scanInput.mode === "retire") sets.retired_at = now;
+    if (scanInput.mode === "clean_complete") sets.last_cleaned_at = now;
+    if (scanInput.mode === "inspect") sets.last_inspected_at = now;
+    if (scanInput.condition) sets.current_condition = scanInput.condition;
 
     const keys = Object.keys(sets);
     await run(
@@ -158,21 +170,21 @@ export async function processScan(db: Db, input: ScanInput): Promise<ScanResult>
       db,
       `INSERT INTO asset_status_history (id, asset_id, from_status, to_status, scan_event_id, changed_by, changed_at, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      id("ash"), asset.id, asset.current_status, targetStatus, scanId, input.userId ?? null, deviceTs, input.notes ?? null,
+      id("ash"), asset.id, asset.current_status, targetStatus, scanId, scanInput.userId ?? null, deviceTs, scanInput.notes ?? null,
     );
   }
 
   // order_assets bookkeeping
-  if (input.orderId) {
-    if (input.mode === "deliver") {
+  if (scanInput.orderId) {
+    if (scanInput.mode === "deliver") {
       await run(db, `UPDATE order_assets SET delivered_at = ?, delivery_condition = COALESCE(?, delivery_condition) WHERE order_id = ? AND asset_id = ?`,
-        deviceTs, input.condition ?? "good", input.orderId, asset.id);
-    } else if (input.mode === "pickup") {
+        deviceTs, scanInput.condition ?? "good", scanInput.orderId, asset.id);
+    } else if (scanInput.mode === "pickup") {
       await run(db, `UPDATE order_assets SET picked_up_at = ?, return_condition = COALESCE(?, return_condition) WHERE order_id = ? AND asset_id = ?`,
-        deviceTs, input.condition ?? null, input.orderId, asset.id);
-    } else if (input.mode === "warehouse_return") {
+        deviceTs, scanInput.condition ?? null, scanInput.orderId, asset.id);
+    } else if (scanInput.mode === "warehouse_return") {
       await run(db, `UPDATE order_assets SET warehouse_return_at = ? WHERE order_id = ? AND asset_id = ?`,
-        deviceTs, input.orderId, asset.id);
+        deviceTs, scanInput.orderId, asset.id);
     }
   }
 
@@ -209,6 +221,7 @@ export async function reserveAssets(
   const reserved: Record<string, number> = {};
   const now = nowIso();
 
+  const selected: AssetRow[] = [];
   for (const [type, needed] of Object.entries(requirements)) {
     if (needed <= 0) continue;
     const available = await q<AssetRow>(
@@ -219,15 +232,21 @@ export async function reserveAssets(
     );
     reserved[type] = available.length;
     if (available.length < needed) shortages[type] = needed - available.length;
-    for (const asset of available) {
-      await run(db, `UPDATE assets SET current_status = 'reserved', current_order_id = ?, version = version + 1, updated_at = ? WHERE id = ?`,
-        orderId, now, asset.id);
-      await run(db, `INSERT INTO asset_status_history (id, asset_id, from_status, to_status, changed_at, notes)
-                     VALUES (?, ?, 'clean_inventory', 'reserved', ?, ?)`,
-        id("ash"), asset.id, now, `Reserved for order ${orderId}`);
-      await run(db, `INSERT INTO order_assets (id, order_id, asset_id, assigned_at) VALUES (?, ?, ?, ?)`,
-        id("oa"), orderId, asset.id, now);
+    selected.push(...available);
+  }
+  // Never leave a partially allocated order: determine every shortage before
+  // writing anything, then submit the reservation as one D1 batch.
+  if (Object.keys(shortages).length > 0) return { reserved, shortages };
+  if (selected.length) {
+    const statements: D1PreparedStatement[] = [];
+    for (const asset of selected) {
+      statements.push(
+        stmt(db, "UPDATE assets SET current_status='reserved',current_order_id=?,version=version+1,updated_at=? WHERE id=? AND current_status='clean_inventory'", orderId, now, asset.id),
+        stmt(db, "INSERT INTO asset_status_history (id,asset_id,from_status,to_status,changed_at,notes) VALUES (?,?,'clean_inventory','reserved',?,?)", id("ash"), asset.id, now, `Reserved for order ${orderId}`),
+        stmt(db, "INSERT INTO order_assets (id,order_id,asset_id,assigned_at) VALUES (?,?,?,?)", id("oa"), orderId, asset.id, now),
+      );
     }
+    await db.batch(statements);
   }
   return { reserved, shortages };
 }

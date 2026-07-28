@@ -127,6 +127,19 @@ export function OpsRecord({
       setSaving(false);
     }
   }
+  async function stageAllReservedAssets() {
+    if (!window.confirm("Stage every reserved item assigned to this order?")) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const r = await fetch(`/api/orders/${id}/stage`, { method: "POST" });
+      const p = (await r.json().catch(() => null)) as { staged?: string[]; failed?: unknown[]; error?: { message?: string } } | null;
+      if (!r.ok) { setError(p?.error?.message ?? "The reserved equipment could not be staged."); return; }
+      const staged = p?.staged?.length ?? 0, failed = p?.failed?.length ?? 0;
+      setNotice(staged ? `Staged ${staged} reserved item${staged === 1 ? "" : "s"}${failed ? `; ${failed} item${failed === 1 ? "" : "s"} need attention.` : "."}` : "No reserved equipment is ready to stage.");
+      await load();
+    } catch { setError("The reserved equipment could not be staged."); }
+    finally { setSaving(false); }
+  }
   if (!data)
     return (
       <main className="record">
@@ -594,11 +607,16 @@ export function OpsRecord({
         <section>
           <div className="section-heading">
             <h2>Dispatch & equipment</h2>
-            <button type="button" className="primary" disabled={saving || !assets.some((asset) => String(asset.current_status) === "staged")} onClick={() => void loadAllStagedAssets()}>
-              Load all staged items
-            </button>
+            <div className="record-actions">
+              <button type="button" className="secondary" disabled={saving || !assets.some((asset) => String(asset.current_status) === "reserved")} onClick={() => void stageAllReservedAssets()}>
+                Stage all reserved items
+              </button>
+              <button type="button" className="primary" disabled={saving || !assets.some((asset) => String(asset.current_status) === "staged")} onClick={() => void loadAllStagedAssets()}>
+                Load all staged items
+              </button>
+            </div>
           </div>
-          <p className="desk-hint">Loads every staged asset assigned to this order in one audited action.</p>
+          <p className="desk-hint">Stage reserved equipment, then load every staged asset in audited bulk actions.</p>
           {assignments.map((a, i) => (
             <div className="record-row" key={i}>
               <div>

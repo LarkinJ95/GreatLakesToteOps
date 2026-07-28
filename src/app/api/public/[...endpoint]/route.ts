@@ -1,6 +1,6 @@
 import { getEnv } from "@/lib/cloudflare";
 import { escapeHtml, id, nowIso, one, q, run } from "@/lib/db";
-import { createOrder } from "@/lib/services/orderService";
+import { createOrder, transitionOrder } from "@/lib/services/orderService";
 
 type Ctx = { params: Promise<{ endpoint: string[] }> };
 const json = (body: unknown, status = 200) =>
@@ -524,6 +524,11 @@ export async function POST(request: Request, context: Ctx) {
         agreementId,
         order.id,
       );
+      // The agreement is accepted during the same website reservation. Move the
+      // order into the payment queue immediately so it appears in operations.
+      await transitionOrder(env.DB, null, order.id, "awaiting_payment", {
+        reason: "Website reservation completed with accepted agreement",
+      });
     }
     const invoiceId = id("inv"),
       invoiceNumber = `GLMT-INV-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,

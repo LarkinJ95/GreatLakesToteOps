@@ -15,7 +15,9 @@ import { reserveAssets } from "./assetService";
 
 /** Allowed order transitions. See docs/09. */
 export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  inquiry: ["quote", "cancelled"],
+  // Website reservations can be signed in one request and therefore enter the
+  // payment queue directly instead of remaining an inquiry.
+  inquiry: ["quote", "awaiting_payment", "cancelled"],
   quote: ["awaiting_customer_approval", "cancelled"],
   awaiting_customer_approval: ["awaiting_agreement", "cancelled"],
   awaiting_agreement: [
@@ -362,7 +364,7 @@ export interface TransitionOpts {
 /** Run a validated order transition with its guards. */
 export async function transitionOrder(
   db: Db,
-  ctx: AuthContext,
+  ctx: AuthContext | null,
   orderId: string,
   toStatus: OrderStatus,
   opts: TransitionOpts = {},
@@ -405,6 +407,22 @@ export async function transitionOrder(
       );
     }
   }
+  if (toStatus === "staged") {
+    const unstaged = await one<{ n: number }>(db,
+      "SELECT COUNT(*) AS n FROM order_assets oa JOIN assets a ON a.id=oa.asset_id WHERE oa.order_id=? AND oa.missing=0 AND a.current_status!='staged'", orderId);
+    if ((unstaged?.n ?? 0) > 0)
+      throw new StateConflictError(`${unstaged!.n} allocated asset(s) must be staged before the order can be staged`);
+  }
+  if (toStatus === "out_for_delivery") {
+    const unloaded = await one<{ n: number }>(db,
+      "SELECT COUNT(*) AS n FROM order_assets oa JOIN assets a ON a.id=oa.asset_id WHERE oa.order_id=? AND oa.missing=0 AND a.current_status!='loaded'", orderId);
+    if ((unloaded?.n ?? 0) > 0)
+      throw new StateConflictError(`${unloaded!.n} allocated asset(s) must be loaded before dispatch`);
+    const staffed = await one<{ n: number }>(db,
+      "SELECT COUNT(*) AS n FROM assignments WHERE order_id=? AND assignment_type='delivery' AND status NOT IN ('cancelled','failed') AND assigned_employee_id IS NOT NULL AND vehicle_id IS NOT NULL", orderId);
+    if ((staffed?.n ?? 0) === 0)
+      throw new StateConflictError("Assign a driver and vehicle to a delivery assignment before dispatch");
+  }
   if (toStatus === "delivered") {
     const undelivered = await one<{ n: number }>(
       db,
@@ -417,7 +435,7 @@ export async function transitionOrder(
       );
     }
     if (order.requires_agreement && order.agreement_status !== "accepted") {
-      if (!opts.overrideAgreement || !ctx.permissions.has("orders.edit")) {
+      if (!opts.overrideAgreement || !ctx?.permissions.has("orders.edit")) {
         throw new StateConflictError(
           "Accepted agreement required to complete delivery (manager override with reason required)",
         );
@@ -425,6 +443,24 @@ export async function transitionOrder(
       if (!opts.reason)
         throw new ValidationError("An override reason is required");
     }
+  }
+  if (toStatus === "picked_up") {
+    const pending = await one<{ n: number }>(db,
+      "SELECT COUNT(*) AS n FROM order_assets WHERE order_id=? AND picked_up_at IS NULL AND missing=0", orderId);
+    if ((pending?.n ?? 0) > 0)
+      throw new StateConflictError(`${pending!.n} asset(s) have not been scanned as picked up`);
+  }
+  if (toStatus === "equipment_reconciliation") {
+    const pending = await one<{ n: number }>(db,
+      "SELECT COUNT(*) AS n FROM order_assets WHERE order_id=? AND warehouse_return_at IS NULL AND missing=0", orderId);
+    if ((pending?.n ?? 0) > 0)
+      throw new StateConflictError(`${pending!.n} asset(s) have not been scanned back into the warehouse`);
+  }
+  if (toStatus === "final_invoice_review") {
+    const pending = await one<{ n: number }>(db,
+      "SELECT COUNT(*) AS n FROM order_assets oa JOIN assets a ON a.id=oa.asset_id WHERE oa.order_id=? AND oa.missing=0 AND a.current_status IN ('picked_up','dirty_return','cleaning','inspection_required')", orderId);
+    if ((pending?.n ?? 0) > 0)
+      throw new StateConflictError(`${pending!.n} asset(s) still need warehouse cleaning or inspection`);
   }
   if (
     toStatus === "completed" &&
@@ -465,12 +501,12 @@ export async function transitionOrder(
     orderId,
     from,
     toStatus,
-    ctx.user.id,
+    ctx?.user.id ?? null,
     opts.reason ?? null,
-    opts.overrideAgreement ? ctx.user.id : null,
+    opts.overrideAgreement ? (ctx?.user.id ?? null) : null,
   );
   await audit(db, {
-    actorUserId: ctx.user.id,
+    actorUserId: ctx?.user.id ?? null,
     action: "order.transition",
     entityType: "order",
     entityId: orderId,
@@ -480,7 +516,7 @@ export async function transitionOrder(
       reason: opts.reason ?? null,
       override: !!opts.overrideAgreement,
     },
-    ip: ctx.ip,
+    ip: ctx?.ip ?? null,
   });
   return getOrder(db, orderId);
 }
