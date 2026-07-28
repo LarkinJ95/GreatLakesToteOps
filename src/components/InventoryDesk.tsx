@@ -31,32 +31,39 @@ export function InventoryDesk() {
   }, []);
   async function add(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
     setSaving(true);
     setError("");
-    const f = new FormData(e.currentTarget);
-    const r = await fetch("/api/assets", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        assetType: f.get("assetType"),
-        quantity: Number(f.get("quantity")),
-        replacementCostCents: Math.round(
-          Number(f.get("replacementCostUsd")) * 100,
-        ),
-        color: f.get("color"),
-      }),
-    });
-    const p = (await r.json().catch(() => null)) as {
-      quantity?: number;
-      error?: { message?: string };
-    } | null;
-    if (!r.ok) setError(p?.error?.message ?? "Asset could not be added");
-    else {
-      e.currentTarget.reset();
+    try {
+      const f = new FormData(form);
+      const r = await fetch("/api/assets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          assetType: f.get("assetType"),
+          quantity: Number(f.get("quantity")),
+          replacementCostCents: Math.round(
+            Number(f.get("replacementCostUsd")) * 100,
+          ),
+          color: f.get("color"),
+        }),
+      });
+      const p = (await r.json().catch(() => null)) as {
+        quantity?: number;
+        error?: { message?: string };
+      } | null;
+      if (!r.ok) {
+        setError(p?.error?.message ?? "Asset could not be added");
+        return;
+      }
+      form.reset();
       setStatus(`${p?.quantity ?? 1} asset${p?.quantity === 1 ? "" : "s"} added. Receive them into clean inventory when ready.`);
-      void load();
+      await load();
+    } catch {
+      setError("Could not complete the asset add. If it was saved, reload the page to view it.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
   async function receive(asset: Asset) {
     setStatus("");

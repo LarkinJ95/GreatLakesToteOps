@@ -56,17 +56,24 @@ export function BinDesk() {
   }
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const r = await fetch("/api/bins", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(f)),
-    });
-    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
-    setMessage(r.ok ? "Bin created and ready to assign." : (p?.error?.message ?? "Could not create bin."));
-    if (r.ok) {
-      e.currentTarget.reset();
-      void load();
+    const form = e.currentTarget;
+    try {
+      const f = new FormData(form);
+      const r = await fetch("/api/bins", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(f)),
+      });
+      const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+      if (!r.ok) {
+        setMessage(p?.error?.message ?? "Could not create bin.");
+        return;
+      }
+      form.reset();
+      setMessage("Bin created and ready to assign.");
+      await load();
+    } catch {
+      setMessage("The bin was created, but the screen could not refresh. Reload to view it.");
     }
   }
   return (
