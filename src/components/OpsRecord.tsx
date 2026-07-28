@@ -100,44 +100,16 @@ export function OpsRecord({
       setSaving(false);
     }
   }
-  async function loadAllStagedAssets() {
-    setSaving(true);
-    setError("");
-    setNotice("Loading staged equipment…");
+  async function advanceEquipment() {
+    setSaving(true); setError(""); setNotice("Updating equipment…");
     try {
-      const r = await fetch(`/api/orders/${id}/load`, { method: "POST" });
-      const p = (await r.json().catch(() => null)) as {
-        loaded?: string[];
-        failed?: { assetNumber: string; message: string }[];
-        stagedCount?: number;
-        message?: string;
-        error?: { message?: string };
-      } | null;
-      if (!r.ok) {
-        setError(p?.error?.message ?? "The staged equipment could not be loaded.");
-        return;
-      }
-      const loaded = p?.loaded?.length ?? 0;
-      const failed = p?.failed?.length ?? 0;
-      const firstFailure = p?.failed?.[0]?.message;
-      setNotice(loaded ? `Loaded ${loaded} staged item${loaded === 1 ? "" : "s"}${failed ? `; ${failed} item${failed === 1 ? "" : "s"} need attention${firstFailure ? ` (${firstFailure})` : ""}.` : "."}` : (p?.message ?? firstFailure ?? "No staged equipment is ready to load."));
+      const r = await fetch(`/api/orders/${id}/equipment-action`, { method: "POST" });
+      const p = (await r.json().catch(() => null)) as { action?: string | null; label?: string; completed?: string[]; failed?: { message?: string }[]; error?: { message?: string } } | null;
+      if (!r.ok) { setError(p?.error?.message ?? "The equipment action could not be completed."); return; }
+      const count = p?.completed?.length ?? 0, failed = p?.failed?.length ?? 0;
+      setNotice(count ? `${p?.label ?? "Equipment updated"}: ${count} item${count === 1 ? "" : "s"}${failed ? `; ${failed} need attention.` : "."}` : (p?.label ?? "No equipment action is pending."));
       await load();
-    } catch {
-      setError("The staged equipment could not be loaded.");
-    } finally {
-      setSaving(false);
-    }
-  }
-  async function stageAllReservedAssets() {
-    setSaving(true); setError(""); setNotice("Staging reserved equipment…");
-    try {
-      const r = await fetch(`/api/orders/${id}/stage`, { method: "POST" });
-      const p = (await r.json().catch(() => null)) as { staged?: string[]; failed?: unknown[]; error?: { message?: string } } | null;
-      if (!r.ok) { setError(p?.error?.message ?? "The reserved equipment could not be staged."); return; }
-      const staged = p?.staged?.length ?? 0, failed = p?.failed?.length ?? 0;
-      setNotice(staged ? `Staged ${staged} reserved item${staged === 1 ? "" : "s"}${failed ? `; ${failed} item${failed === 1 ? "" : "s"} need attention.` : "."}` : "No reserved equipment is ready to stage.");
-      await load();
-    } catch { setError("The reserved equipment could not be staged."); }
+    } catch { setError("The equipment action could not be completed."); }
     finally { setSaving(false); }
   }
   async function assignPackageEquipment() {
@@ -637,16 +609,11 @@ export function OpsRecord({
         <section>
           <div className="section-heading">
             <h2>Dispatch & equipment</h2>
-            <div className="record-actions">
-              <button type="button" className="secondary" disabled={saving} onClick={() => void stageAllReservedAssets()}>
-                {saving ? "Working…" : "Stage all reserved items"}
-              </button>
-              <button type="button" className="primary" disabled={saving} onClick={() => void loadAllStagedAssets()}>
-                {saving ? "Working…" : "Load all staged items"}
-              </button>
-            </div>
+            <button type="button" className="primary" disabled={saving} onClick={() => void advanceEquipment()}>
+              {saving ? "Working…" : assets.some((asset) => String(asset.current_status) === "reserved") ? "Stage all equipment" : assets.some((asset) => String(asset.current_status) === "staged") ? "Load all equipment" : assets.some((asset) => String(asset.current_status) === "loaded") ? "Deliver all equipment" : assets.some((asset) => ["delivered", "rented", "pickup_scheduled"].includes(String(asset.current_status))) ? "Pick up all equipment" : "Equipment complete"}
+            </button>
           </div>
-          <p className="desk-hint">Stage reserved equipment, then load every staged asset in audited bulk actions.</p>
+          <p className="desk-hint">One guided action moves all assigned equipment through: stage, load, deliver, then pick up.</p>
           <div className="record-grid">
             <section>
               <h3>Assign package equipment</h3>
