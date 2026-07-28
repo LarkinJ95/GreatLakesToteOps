@@ -140,6 +140,26 @@ export function OpsRecord({
     } catch { setError("The reserved equipment could not be staged."); }
     finally { setSaving(false); }
   }
+  async function assignPackageEquipment() {
+    setSaving(true); setError(""); setNotice("Assigning required package equipment…");
+    try {
+      const r = await fetch(`/api/orders/${id}/assets`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "auto" }) });
+      const p = (await r.json().catch(() => null)) as { assigned?: Record<string, number>; error?: { message?: string } } | null;
+      if (!r.ok) { setError(p?.error?.message ?? "Package equipment could not be assigned."); return; }
+      const count = Object.values(p?.assigned ?? {}).reduce((total, value) => total + Number(value), 0);
+      setNotice(count ? `Assigned ${count} required package item${count === 1 ? "" : "s"}.` : "The full package is already assigned."); await load();
+    } catch { setError("Package equipment could not be assigned."); } finally { setSaving(false); }
+  }
+  async function assignSelectedEquipment(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setSaving(true); setError(""); setNotice("Assigning selected equipment…");
+    const assetIds = new FormData(e.currentTarget).getAll("assetIds");
+    try {
+      const r = await fetch(`/api/orders/${id}/assets`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "selected", assetIds }) });
+      const p = (await r.json().catch(() => null)) as { assigned?: string[]; error?: { message?: string } } | null;
+      if (!r.ok) { setError(p?.error?.message ?? "Selected equipment could not be assigned."); return; }
+      setNotice(`Assigned ${p?.assigned?.length ?? 0} selected item(s).`); await load();
+    } catch { setError("Selected equipment could not be assigned."); } finally { setSaving(false); }
+  }
   if (!data)
     return (
       <main className="record">
@@ -296,6 +316,7 @@ export function OpsRecord({
     history = (data.statusHistory ?? []) as Row[],
     cancellation = data.cancellation as Row | null,
     equipmentAvailability = (data.equipmentAvailability ?? []) as Row[],
+    assignableAssets = (data.assignableAssets ?? []) as Row[],
     binHistory = (data.binHistory ?? []) as Row[];
   const bins = (data.bins ?? []) as Row[];
   const equipment = [
@@ -626,6 +647,20 @@ export function OpsRecord({
             </div>
           </div>
           <p className="desk-hint">Stage reserved equipment, then load every staged asset in audited bulk actions.</p>
+          <div className="record-grid">
+            <section>
+              <h3>Assign package equipment</h3>
+              <p className="desk-hint">Assigns all remaining totes and dollies required by this package in one action.</p>
+              <button type="button" className="primary" disabled={saving} onClick={() => void assignPackageEquipment()}>{saving ? "Working…" : "Assign required equipment"}</button>
+            </section>
+            <section>
+              <h3>Assign specific equipment</h3>
+              <form className="record-form" onSubmit={assignSelectedEquipment}>
+                <label>Available equipment (select multiple)<select name="assetIds" multiple size={6}>{assignableAssets.map((asset) => <option key={String(asset.id)} value={String(asset.id)}>{String(asset.asset_number)} · {words(asset.asset_type)}</option>)}</select></label>
+                <button className="secondary" disabled={saving || !assignableAssets.length}>{saving ? "Working…" : "Assign selected equipment"}</button>
+              </form>
+            </section>
+          </div>
           {assignments.map((a, i) => (
             <div className="record-row" key={i}>
               <div>

@@ -31,6 +31,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       bins,
       binHistory,
       equipmentAvailability,
+      assignableAssets,
     ] = await Promise.all([
       q(
         env.DB,
@@ -77,6 +78,10 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
         "SELECT asset_type,COUNT(*) AS total_count,SUM(CASE WHEN current_status='clean_inventory' THEN 1 ELSE 0 END) AS clean_available_count,SUM(CASE WHEN current_order_id=? THEN 1 ELSE 0 END) AS allocated_to_order_count FROM assets WHERE deleted_at IS NULL AND asset_type IN ('tote','dolly') GROUP BY asset_type",
         orderId,
       ),
+      q(
+        env.DB,
+        "SELECT id,asset_number,asset_type,current_status FROM assets WHERE deleted_at IS NULL AND current_status='clean_inventory' AND current_order_id IS NULL ORDER BY asset_type,asset_number LIMIT 300",
+      ),
     ]);
     return Response.json({
       order,
@@ -89,6 +94,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       bins,
       binHistory,
       equipmentAvailability,
+      assignableAssets,
     });
   },
 );
