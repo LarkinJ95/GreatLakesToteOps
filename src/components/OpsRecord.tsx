@@ -143,7 +143,11 @@ export function OpsRecord({
           <section>
             <h2>Invoices</h2>
             {invoices.map((i) => (
-              <div className="record-row" key={String(i.invoice_number)}>
+              <a
+                className="record-row"
+                href={`/invoices/${String(i.id)}`}
+                key={String(i.invoice_number)}
+              >
                 <div>
                   <strong>{String(i.invoice_number)}</strong>
                   <span>
@@ -151,13 +155,17 @@ export function OpsRecord({
                   </span>
                 </div>
                 <b>{money(i.balance_due_cents)}</b>
-              </div>
+              </a>
             ))}
           </section>
           <section>
             <h2>Signed contracts</h2>
             {agreements.map((a) => (
-              <div className="record-row" key={String(a.agreement_number)}>
+              <a
+                className="record-row"
+                href={`/agreements/${String(a.id)}`}
+                key={String(a.agreement_number)}
+              >
                 <div>
                   <strong>{String(a.agreement_number)}</strong>
                   <span>
@@ -165,7 +173,7 @@ export function OpsRecord({
                   </span>
                 </div>
                 <b>{a.accepted_at ? "Signed" : "Pending"}</b>
-              </div>
+              </a>
             ))}
           </section>
           <section>
