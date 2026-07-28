@@ -45,10 +45,10 @@ export function InvoiceWorkspace({ id }: { id: string }) {
     e.preventDefault();
     setSaving(true);
     const f = new FormData(e.currentTarget);
-    const r = await fetch(`/api/invoices/${id}/payments`, {
+    const r = await fetch(`/api/invoices/${id}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ amountCents: Math.round(Number(f.get("amountUsd")) * 100), method: f.get("method") }),
+      body: JSON.stringify({ action: "recordPayment", amountCents: Math.round(Number(f.get("amountUsd")) * 100), method: f.get("method") }),
     });
     const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
     setMessage(r.ok ? "Payment recorded." : p?.error?.message ?? "Payment could not be recorded.");
