@@ -19,11 +19,15 @@ type Customer = {
   business_name: string | null;
 };
 type Location = { id: string; code: string; name: string };
+type Asset = { id: string; asset_number: string; asset_type: string; current_status: string };
+type AssetAssignment = { id: string; asset_id: string; bin_id: string; asset_number: string; asset_type: string; current_status: string; bin_code: string; location_code: string };
 export function BinDesk() {
   const [bins, setBins] = useState<Bin[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
     [customers, setCustomers] = useState<Customer[]>([]),
     [locations, setLocations] = useState<Location[]>([]),
+    [assets, setAssets] = useState<Asset[]>([]),
+    [assetAssignments, setAssetAssignments] = useState<AssetAssignment[]>([]),
     [message, setMessage] = useState("");
   const load = async () => {
     const [b, o, c] = await Promise.all([
@@ -32,9 +36,11 @@ export function BinDesk() {
       fetch("/api/customers"),
     ]);
     if (b.ok) {
-      const data = (await b.json()) as { bins: Bin[]; locations: Location[] };
+      const data = (await b.json()) as { bins: Bin[]; locations: Location[]; assets: Asset[]; assetAssignments: AssetAssignment[] };
       setBins(data.bins);
       setLocations(data.locations);
+      setAssets(data.assets);
+      setAssetAssignments(data.assetAssignments);
     }
     if (o.ok) setOrders(((await o.json()) as { orders: Order[] }).orders);
     if (c.ok)
@@ -53,6 +59,13 @@ export function BinDesk() {
       });
     setMessage(r.ok ? "Bin assignment saved." : "Could not assign that bin.");
     if (r.ok) void load();
+  }
+  async function assignAsset(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const r = await fetch("/api/bins", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(Object.fromEntries(new FormData(e.currentTarget))) });
+    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+    setMessage(r.ok ? "Equipment location saved." : (p?.error?.message ?? "Could not place that equipment in a bin."));
+    if (r.ok) await load();
   }
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -152,6 +165,14 @@ export function BinDesk() {
           {message && <p className="desk-hint">{message}</p>}
         </form>
         <div className="record-grid">
+          <form className="create-order" onSubmit={assignAsset}>
+            <p className="eyebrow">PLACE EQUIPMENT</p>
+            <h2>Put an item in a physical bin</h2>
+            <label>Equipment<select name="assetId" required><option value="">Choose asset</option>{assets.map((asset) => <option value={asset.id} key={asset.id}>{asset.asset_number} · {asset.asset_type.replaceAll("_", " ")} · {asset.current_status.replaceAll("_", " ")}</option>)}</select></label>
+            <label>Bin<select name="binId" required><option value="">Choose bin</option>{bins.map((bin) => <option value={bin.id} key={bin.id}>{bin.location_code} · {bin.code}</option>)}</select></label>
+            <label>Location note<textarea name="notes" placeholder="Shelf, stack, condition…" /></label>
+            <button className="primary">Save equipment location</button>
+          </form>
           <form className="create-order" onSubmit={create}>
             <p className="eyebrow">CREATE BIN</p>
             <h2>Add a physical bin</h2>
@@ -188,7 +209,7 @@ export function BinDesk() {
                 </div>
                 <div>
                   <span>
-                    {b.order_number || b.customer_name || "Available"}
+                    {b.order_number || b.customer_name || "Available"} · {assetAssignments.filter((assignment) => assignment.bin_id === b.id).length} item(s)
                   </span>
                 </div>
                 {b.order_id ? (
@@ -208,6 +229,11 @@ export function BinDesk() {
               </article>
             ))}
           </div>
+          </section>
+          <section className="order-list">
+            <p className="eyebrow">EQUIPMENT LOCATIONS</p>
+            <h2>Items currently in bins</h2>
+            <div className="orders-table">{assetAssignments.map((assignment) => <article key={assignment.id}><div><strong>{assignment.asset_number}</strong><span>{assignment.asset_type.replaceAll("_", " ")} · {assignment.current_status.replaceAll("_", " ")}</span></div><div><span>{assignment.location_code} · {assignment.bin_code}</span></div><a className="record-link" href={`/inventory/${assignment.asset_id}`}>Open equipment</a></article>)}</div>
           </section>
         </div>
       </section>
