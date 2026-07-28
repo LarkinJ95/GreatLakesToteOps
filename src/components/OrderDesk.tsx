@@ -25,6 +25,14 @@ type Order = {
   total_cents: number;
   customer_name: string;
 };
+type Address = {
+  id: string;
+  label: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+};
 const money = (cents: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     cents / 100,
@@ -34,6 +42,8 @@ export function OrderDesk() {
   const [customers, setCustomers] = useState<Customer[]>([]),
     [packages, setPackages] = useState<Package[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
+    [selectedCustomer, setSelectedCustomer] = useState(""),
+    [addresses, setAddresses] = useState<Address[]>([]),
     [error, setError] = useState(""),
     [saving, setSaving] = useState(false);
   async function load() {
@@ -53,6 +63,17 @@ export function OrderDesk() {
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    if (!selectedCustomer) {
+      setAddresses([]);
+      return;
+    }
+    void fetch(`/api/customers/${selectedCustomer}/addresses`).then(
+      async (r) =>
+        r.ok &&
+        setAddresses(((await r.json()) as { addresses: Address[] }).addresses),
+    );
+  }, [selectedCustomer]);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -67,6 +88,10 @@ export function OrderDesk() {
         rentalStartDate: f.get("delivery"),
         scheduledDeliveryDate: f.get("delivery"),
         scheduledPickupDate: f.get("pickup"),
+        deliveryAddressId: f.get("deliveryAddressId"),
+        pickupAddressId: f.get("pickupAddressId"),
+        preferredDeliveryWindow: f.get("preferredDeliveryWindow"),
+        preferredPickupWindow: f.get("preferredPickupWindow"),
         customerNotes: f.get("notes"),
       }),
     });
@@ -77,6 +102,8 @@ export function OrderDesk() {
       setError(p?.error?.message ?? "Order could not be created");
     } else {
       event.currentTarget.reset();
+      setSelectedCustomer("");
+      setAddresses([]);
       void load();
     }
     setSaving(false);
@@ -134,7 +161,12 @@ export function OrderDesk() {
           <h2>Create an order</h2>
           <label>
             Customer
-            <select name="customerId" required>
+            <select
+              name="customerId"
+              required
+              value={selectedCustomer}
+              onChange={(e) => setSelectedCustomer(e.target.value)}
+            >
               <option value="">Select a customer</option>
               {customers.map((c) => (
                 <option value={c.id} key={c.id}>
@@ -144,6 +176,46 @@ export function OrderDesk() {
               ))}
             </select>
           </label>
+          <div className="form-pair">
+            <label>
+              Delivery address
+              <select
+                name="deliveryAddressId"
+                required
+                disabled={!addresses.length}
+              >
+                <option value="">
+                  {addresses.length
+                    ? "Select delivery address"
+                    : "Select customer first"}
+                </option>
+                {addresses.map((a) => (
+                  <option value={a.id} key={a.id}>
+                    {a.label} · {a.street}, {a.city}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Pickup address
+              <select
+                name="pickupAddressId"
+                required
+                disabled={!addresses.length}
+              >
+                <option value="">
+                  {addresses.length
+                    ? "Select pickup address"
+                    : "Select customer first"}
+                </option>
+                {addresses.map((a) => (
+                  <option value={a.id} key={a.id}>
+                    {a.label} · {a.street}, {a.city}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <label>
             Package
             <select name="packageId" required>
@@ -164,6 +236,26 @@ export function OrderDesk() {
             <label>
               Pickup
               <input name="pickup" type="date" required />
+            </label>
+          </div>
+          <div className="form-pair">
+            <label>
+              Preferred delivery window
+              <select name="preferredDeliveryWindow">
+                <option value="">No preference</option>
+                <option>Morning (8–11 AM)</option>
+                <option>Midday (11 AM–2 PM)</option>
+                <option>Afternoon (2–5 PM)</option>
+              </select>
+            </label>
+            <label>
+              Preferred pickup window
+              <select name="preferredPickupWindow">
+                <option value="">No preference</option>
+                <option>Morning (8–11 AM)</option>
+                <option>Midday (11 AM–2 PM)</option>
+                <option>Afternoon (2–5 PM)</option>
+              </select>
             </label>
           </div>
           <label>
