@@ -153,8 +153,6 @@ export function OpsRecord({
       orders = (data.orders ?? []) as Row[],
       invoices = (data.invoices ?? []) as Row[],
       agreements = (data.agreements ?? []) as Row[],
-      bins = (data.bins ?? []) as Row[],
-      binHistory = (data.binHistory ?? []) as Row[],
       equipment = (data.equipment ?? []) as Row[],
       history = (data.history ?? []) as Row[];
     return (
@@ -278,11 +276,6 @@ export function OpsRecord({
             ))}
           </section>
           <section>
-            <h2>Warehouse holds</h2>
-            {bins.length ? bins.map((bin, i) => <a className="record-row" href={bin.order_id ? `/orders/${String(bin.order_id)}` : "/bins"} key={i}><div><strong>{String(bin.location_code)} · {String(bin.code)}</strong><span>{String(bin.purpose ?? "hold")}</span></div><b>{bin.order_number ? String(bin.order_number) : "Customer"}</b></a>) : <p className="empty">No active warehouse bin assignments.</p>}
-            {binHistory.filter((bin) => String(bin.status) !== "active").map((bin, i) => <div className="record-row" key={`bin-history-${i}`}><div><strong>{String(bin.location_code)} · {String(bin.code)}</strong><span>{String(bin.order_number ?? "Customer hold")} · {date(bin.assigned_at)}</span></div><b>{words(bin.status)}</b></div>)}
-          </section>
-          <section>
             <h2>Equipment custody</h2>
             {equipment.length ? equipment.map((asset, i) => <a className="record-row" href={`/orders/${String(asset.order_id)}`} key={i}><div><strong>{String(asset.asset_number)}</strong><span>{words(asset.asset_type)} · {words(asset.current_status)} · {String(asset.order_number)}</span></div><b>{asset.warehouse_return_at ? "Returned" : asset.picked_up_at ? "Picked up" : asset.delivered_at ? "With customer" : "Allocated"}</b></a>) : <p className="empty">No equipment has been assigned to this customer.</p>}
           </section>
@@ -298,9 +291,7 @@ export function OpsRecord({
     history = (data.statusHistory ?? []) as Row[],
     cancellation = data.cancellation as Row | null,
     equipmentAvailability = (data.equipmentAvailability ?? []) as Row[],
-    assignableAssets = (data.assignableAssets ?? []) as Row[],
-    binHistory = (data.binHistory ?? []) as Row[];
-  const bins = (data.bins ?? []) as Row[];
+    assignableAssets = (data.assignableAssets ?? []) as Row[];
   const equipment = [
     { type: "tote", label: "Totes", required: Number(o.package_tote_quantity ?? 0) },
     { type: "dolly", label: "Dollies", required: Number(o.package_dolly_quantity ?? 0) },
@@ -604,11 +595,6 @@ export function OpsRecord({
               Save audited pricing
             </button>
           </form>
-        </section>
-        <section>
-          <h2>Warehouse bins</h2>
-          {bins.length ? bins.map((bin, i) => <div className="record-row" key={i}><div><strong>{String(bin.location_code)} · {String(bin.code)}</strong><span>{String(bin.purpose ?? "hold")}</span></div><b>Assigned</b></div>) : <p className="empty">No bin is assigned to this order.</p>}
-          {binHistory.filter((bin) => String(bin.status) !== "active").map((bin, i) => <div className="record-row" key={`bin-history-${i}`}><div><strong>{String(bin.location_code)} · {String(bin.code)}</strong><span>{String(bin.purpose ?? "hold")} · {date(bin.assigned_at)}</span></div><b>{words(bin.status)}</b></div>)}
         </section>
         <section>
           <h2>Cancellation</h2>

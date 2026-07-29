@@ -94,7 +94,6 @@ const links = [
   ["$", "Billing", "/billing"],
   ["↗", "Reports", "/reports"],
   ["▣", "Inventory", "/inventory"],
-  ["⌗", "Warehouse bins", "/bins"],
 ] as const;
 
 export function KimiOpsShell({

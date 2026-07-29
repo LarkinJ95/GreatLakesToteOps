@@ -31,16 +31,13 @@ export const GET = withErrorHandling(async (request) => {
   if (type) { filters.push("a.asset_type = ?"); values.push(type); }
   if (search) {
     const term = `%${search.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
-    filters.push("(a.asset_number LIKE ? ESCAPE '\\' OR a.qr_code_value LIKE ? ESCAPE '\\' OR b.code LIKE ? ESCAPE '\\' OR o.order_number LIKE ? ESCAPE '\\' OR c.business_name LIKE ? ESCAPE '\\' OR c.first_name LIKE ? ESCAPE '\\' OR c.last_name LIKE ? ESCAPE '\\')");
-    values.push(term, term, term, term, term, term, term);
+    filters.push("(a.asset_number LIKE ? ESCAPE '\\' OR a.qr_code_value LIKE ? ESCAPE '\\' OR o.order_number LIKE ? ESCAPE '\\' OR c.business_name LIKE ? ESCAPE '\\' OR c.first_name LIKE ? ESCAPE '\\' OR c.last_name LIKE ? ESCAPE '\\')");
+    values.push(term, term, term, term, term, term);
   }
   const [assets, statusCounts] = await Promise.all([
-    q(env.DB, `SELECT a.*, b.code AS bin_code, sl.code AS location_code, o.order_number,
+    q(env.DB, `SELECT a.*, o.order_number,
       COALESCE(c.business_name, trim(COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,''))) AS customer_name
       FROM assets a
-      LEFT JOIN asset_bin_assignments aba ON aba.asset_id = a.id AND aba.status = 'active'
-      LEFT JOIN warehouse_bins b ON b.id = aba.bin_id
-      LEFT JOIN storage_locations sl ON sl.id = b.storage_location_id
       LEFT JOIN orders o ON o.id = a.current_order_id
       LEFT JOIN customers c ON c.id = COALESCE(a.current_customer_id, o.customer_id)
       WHERE ${filters.join(" AND ")}
