@@ -16,7 +16,7 @@ type Assignment = {
 };
 type Order = { id: string; order_number: string; customer_name: string };
 type Employee = { id: string; name: string };
-type Vehicle = { id: string; unit_number: string };
+type Vehicle = { id: string; unit_number: string; year?: number | null; make?: string | null; model?: string | null; license_plate?: string | null; max_tote_capacity?: number | null };
 const today = () => new Date().toISOString().slice(0, 10);
 export function DispatchDesk() {
   const [date, setDate] = useState(today()),
@@ -25,7 +25,8 @@ export function DispatchDesk() {
     [employees, setEmployees] = useState<Employee[]>([]),
     [vehicles, setVehicles] = useState<Vehicle[]>([]),
     [error, setError] = useState(""),
-    [saving, setSaving] = useState(false);
+    [saving, setSaving] = useState(false),
+    [showVehicleForm, setShowVehicleForm] = useState(false);
   async function load(day = date) {
     const [a, b] = await Promise.all([
       fetch(`/api/assignments?date=${day}`),
@@ -72,6 +73,16 @@ export function DispatchDesk() {
     }
     setSaving(false);
   }
+  async function addVehicle(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true); setError("");
+    const f = new FormData(e.currentTarget);
+    const r = await fetch("/api/vehicles", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitNumber: f.get("unitNumber"), year: f.get("year"), make: f.get("make"), model: f.get("model"), licensePlate: f.get("licensePlate"), cargoCapacityCuft: f.get("cargoCapacityCuft"), maxToteCapacity: f.get("maxToteCapacity"), notes: f.get("notes") }) });
+    const p = await r.json().catch(() => null) as { error?: { message?: string } } | null;
+    if (!r.ok) setError(p?.error?.message ?? "Vehicle could not be added.");
+    else { e.currentTarget.reset(); setShowVehicleForm(false); await load(); }
+    setSaving(false);
+  }
   return (
     <main className="desk">
       <header className="desk-header">
@@ -93,6 +104,7 @@ export function DispatchDesk() {
         />
       </header>
       <section className="desk-grid">
+        <div>
         <form className="create-order" onSubmit={submit}>
           <p className="eyebrow">NEW ASSIGNMENT</p>
           <h2>Schedule a stop</h2>
@@ -133,7 +145,7 @@ export function DispatchDesk() {
             </label>
             <label>
               Vehicle
-              <select name="vehicleId"><option value="">Unassigned</option>{vehicles.map((vehicle) => <option value={vehicle.id} key={vehicle.id}>{vehicle.unit_number}</option>)}</select>
+              <select name="vehicleId"><option value="">Unassigned</option>{vehicles.map((vehicle) => <option value={vehicle.id} key={vehicle.id}>{vehicle.unit_number}{vehicle.make ? ` · ${vehicle.make}${vehicle.model ? ` ${vehicle.model}` : ""}` : ""}</option>)}</select>
             </label>
           </div>
           <label>
@@ -149,6 +161,17 @@ export function DispatchDesk() {
             {saving ? "Scheduling…" : "Schedule assignment"}
           </button>
         </form>
+        <div className="order-actions" style={{ marginTop: 12 }}><button className="secondary" type="button" onClick={() => setShowVehicleForm(show => !show)}>{showVehicleForm ? "Cancel adding vehicle" : "Add vehicle"}</button></div>
+        {showVehicleForm && <form className="create-order" style={{ marginTop: 12 }} onSubmit={addVehicle}>
+          <p className="eyebrow">VEHICLE FLEET</p><h2>Add delivery vehicle</h2>
+          <label>Unit number<input name="unitNumber" placeholder="e.g. TRUCK-01" required /></label>
+          <div className="form-pair"><label>Year<input name="year" type="number" min="1900" max="2100" /></label><label>License plate<input name="licensePlate" /></label></div>
+          <div className="form-pair"><label>Make<input name="make" placeholder="Ford" /></label><label>Model<input name="model" placeholder="Transit" /></label></div>
+          <div className="form-pair"><label>Cargo capacity (cu ft)<input name="cargoCapacityCuft" type="number" min="1" /></label><label>Max totes<input name="maxToteCapacity" type="number" min="1" defaultValue="60" /></label></div>
+          <label>Notes<textarea name="notes" rows={2} /></label>
+          <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save vehicle"}</button>
+        </form>}
+        </div>
         <section className="order-list">
           <p className="eyebrow">{date}</p>
           <h2>Scheduled stops</h2>
