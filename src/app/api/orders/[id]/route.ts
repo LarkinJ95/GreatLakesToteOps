@@ -50,7 +50,7 @@ export const GET = withErrorHandling<{ params: Promise<{ id: string }> }>(
       ),
       q(
         env.DB,
-        "SELECT id,agreement_number,status,accepted_at,expires_at,verification_code FROM agreements WHERE order_id=? ORDER BY created_at DESC",
+        "SELECT id,agreement_number,status,accepted_at,expires_at,verification_code,unsigned_pdf_document_id,signed_pdf_document_id FROM agreements WHERE order_id=? ORDER BY created_at DESC",
         orderId,
       ),
       q(

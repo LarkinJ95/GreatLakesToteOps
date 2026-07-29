@@ -34,9 +34,7 @@ export function AgreementWorkspace({ id }: { id: string }) {
           </span>
         </div>
         <div className="record-actions">
-          <button className="secondary" onClick={() => window.print()}>
-            Print agreement
-          </button>
+          {Boolean(a.signed_pdf_document_id || a.unsigned_pdf_document_id) && <a className="secondary" href={`/api/documents/${String(a.signed_pdf_document_id || a.unsigned_pdf_document_id)}?download=1`}>Download PDF</a>}
           <a className="primary" href={`/orders/${String(a.order_id)}`}>
             Open order
           </a>
@@ -59,6 +57,10 @@ export function AgreementWorkspace({ id }: { id: string }) {
               {a.signed_pdf_document_id ? "Attached" : "Not available"}
             </span>
           </div>
+          <div className="record-row">
+            <strong>Contract PDF</strong>
+            <span>{a.unsigned_pdf_document_id ? "Generated and retained" : "Not available"}</span>
+          </div>
         </section>
         <section>
           <h2>Agreement record</h2>
@@ -70,9 +72,12 @@ export function AgreementWorkspace({ id }: { id: string }) {
         </section>
         <section>
           <h2>Agreement preview</h2>
+          {Boolean(a.signed_pdf_document_id || a.unsigned_pdf_document_id) ? (
+            <iframe title="Agreement PDF" className="agreement-preview" src={`/api/documents/${String(a.signed_pdf_document_id || a.unsigned_pdf_document_id)}`} />
+          ) : null}
           {a.rendered_html ? (
             <iframe
-              title="Agreement preview"
+              title="Agreement terms"
               sandbox=""
               className="agreement-preview"
               srcDoc={String(a.rendered_html)}

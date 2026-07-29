@@ -17,6 +17,7 @@ type Asset = {
   customer_name: string | null;
 };
 type Count = { current_status: string; count: number };
+type WarehouseBin = { id: string; code: string; location_code: string; location_name: string; bin_type: string; asset_count: number; order_number: string | null; customer_name: string | null };
 
 const money = (cents: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -50,6 +51,7 @@ const statusCards = [
 export function InventoryDesk() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [statusCounts, setStatusCounts] = useState<Count[]>([]);
+  const [bins, setBins] = useState<WarehouseBin[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
@@ -69,13 +71,18 @@ export function InventoryDesk() {
     () => statusCards.find((card) => card.key === status)?.label ?? "All equipment",
     [status],
   );
+  const binsByLocation = useMemo(() => {
+    const groups = new Map<string, WarehouseBin[]>();
+    bins.forEach((bin) => groups.set(bin.location_code, [...(groups.get(bin.location_code) ?? []), bin]));
+    return [...groups.entries()];
+  }, [bins]);
 
   async function load(next = { search, status, type }) {
     const params = new URLSearchParams();
     if (next.search.trim()) params.set("q", next.search.trim());
     if (next.status) params.set("status", next.status);
     if (next.type) params.set("type", next.type);
-    const response = await fetch(`/api/assets${params.size ? `?${params}` : ""}`);
+    const [response, binResponse] = await Promise.all([fetch(`/api/assets${params.size ? `?${params}` : ""}`), fetch("/api/bins")]);
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
       setError(payload?.error?.message ?? "Inventory could not be loaded.");
@@ -84,6 +91,7 @@ export function InventoryDesk() {
     const payload = (await response.json()) as { assets: Asset[]; statusCounts: Count[] };
     setAssets(payload.assets);
     setStatusCounts(payload.statusCounts);
+    if (binResponse.ok) setBins(((await binResponse.json()) as { bins: WarehouseBin[] }).bins);
   }
   useEffect(() => { void load({ search: "", status: "", type: "" }); }, []);
 
@@ -174,6 +182,11 @@ export function InventoryDesk() {
             <span>{card.label}</span><strong>{countFor(card.key)}</strong><small>{card.hint}</small>
           </button>
         ))}
+      </section>
+
+      <section className="inventory-map">
+        <header><div><p className="eyebrow">WAREHOUSE MAP</p><h2>Equipment by physical location</h2></div><a href="/bins">Manage bins →</a></header>
+        {binsByLocation.length ? <div className="inventory-map-locations">{binsByLocation.map(([location, locationBins]) => <section key={location}><header><strong>{location}</strong><span>{locationBins.reduce((total, bin) => total + Number(bin.asset_count ?? 0), 0)} items across {locationBins.length} bins</span></header><div>{locationBins.map((bin) => <a href="/bins" key={bin.id} className={Number(bin.asset_count) ? "stocked" : ""}><strong>{bin.code}</strong><b>{Number(bin.asset_count ?? 0)}</b><span>{bin.order_number || bin.customer_name || words(bin.bin_type)}</span></a>)}</div></section>)}</div> : <p className="empty">No warehouse bins have been created yet.</p>}
       </section>
 
       <section className="inventory-register">

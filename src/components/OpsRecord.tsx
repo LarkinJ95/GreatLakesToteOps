@@ -132,6 +132,16 @@ export function OpsRecord({
       setNotice(`Assigned ${p?.assigned?.length ?? 0} selected item(s).`); await load();
     } catch { setError("Selected equipment could not be assigned."); } finally { setSaving(false); }
   }
+  async function generateContract() {
+    setSaving(true); setError(""); setNotice("Generating rental contract…");
+    try {
+      const r = await fetch(`/api/orders/${id}/agreement`, { method: "POST" });
+      const p = (await r.json().catch(() => null)) as { agreementId?: string; agreementNumber?: string; reused?: boolean; error?: { message?: string } } | null;
+      if (!r.ok) { setError(p?.error?.message ?? "The contract could not be generated."); return; }
+      setNotice(p?.reused ? `An accepted contract already exists: ${p.agreementNumber ?? "agreement"}.` : `Contract ${p?.agreementNumber ?? "generated"} is ready in the customer portal.`);
+      await load();
+    } catch { setError("The contract could not be generated."); } finally { setSaving(false); }
+  }
   if (!data)
     return (
       <main className="record">
@@ -308,6 +318,15 @@ export function OpsRecord({
     { label: "Return", detail: "Pickup & reconcile", href: "#equipment", statuses: ["pickup_scheduled", "pickup_assigned", "picked_up", "equipment_reconciliation", "cleaning", "final_invoice_review", "completed", "closed"] },
   ];
   const currentWorkflowIndex = Math.max(0, workflow.findIndex((step) => step.statuses.includes(status)));
+  function printPickList() {
+    const escape = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+    const lines = assets.map((asset) => `<tr><td>${escape(asset.asset_number)}</td><td>${escape(words(asset.asset_type))}</td><td>${escape(words(asset.current_status))}</td></tr>`).join("");
+    const popup = window.open("", "glmt-pick-list");
+    if (!popup) { setError("Your browser blocked the pick-list print window. Allow pop-ups and try again."); return; }
+    popup.opener = null;
+    popup.document.write(`<!doctype html><html><head><title>Pick list ${escape(o.order_number)}</title><style>body{font:14px Arial,sans-serif;margin:32px;color:#173b52}h1{margin:0 0 5px}p{margin:4px 0 18px;color:#58717e}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #cfdadd;text-align:left}th{font-size:11px;text-transform:uppercase;color:#58717e}</style></head><body><h1>Equipment pick list</h1><p><strong>${escape(o.order_number)}</strong> · ${escape(o.customer_name)} · ${escape(o.package_name ?? "Tote rental")}</p><table><thead><tr><th>Asset</th><th>Type</th><th>Current status</th></tr></thead><tbody>${lines || "<tr><td colspan=\"3\">No equipment is assigned yet.</td></tr>"}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
+    popup.document.close();
+  }
   return (
     <main className="record">
       <a href={`/customers/${String(o.customer_id)}`} className="back">
@@ -529,7 +548,7 @@ export function OpsRecord({
               <h2>Package pick list</h2>
               <p className="empty">{String(o.package_name ?? "No package selected")} · stage this equipment for delivery.</p>
             </div>
-            <button type="button" className="secondary no-print" onClick={() => window.print()}>
+            <button type="button" className="secondary no-print" onClick={printPickList}>
               Print pick list
             </button>
           </div>
@@ -679,16 +698,20 @@ export function OpsRecord({
           ))}
         </section>
         <section id="billing">
-          <h2>Contracts & billing</h2>
+          <div className="section-heading">
+            <div><h2>Contracts & billing</h2><p className="desk-hint">Generate an immutable customer contract with the current order, price, dates, addresses, and equipment terms.</p></div>
+            <button type="button" className="primary no-print" disabled={saving} onClick={() => void generateContract()}>{saving ? "Working…" : agreements.some((agreement) => String(agreement.status) === "accepted") ? "Contract signed" : agreements.length ? "Regenerate contract" : "Generate contract"}</button>
+          </div>
           {agreements.map((a, i) => (
-            <div className="record-row" key={i}>
+            <a className="record-row" href={`/agreements/${String(a.id)}`} key={i}>
               <div>
                 <strong>{String(a.agreement_number)}</strong>
                 <span>
                   {words(a.status)} · Verify {String(a.verification_code)}
                 </span>
               </div>
-            </div>
+              <b>{a.signed_pdf_document_id ? "Signed PDF" : a.unsigned_pdf_document_id ? "Contract PDF" : "Open"}</b>
+            </a>
           ))}
           {invoices.map((i, n) => (
             <div className="record-row" key={`i${n}`}>
