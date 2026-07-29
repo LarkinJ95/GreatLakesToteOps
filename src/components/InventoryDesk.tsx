@@ -1,198 +1,224 @@
 "use client";
-import { FormEvent, useEffect, useState } from "react";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
 type Asset = {
   id: string;
   asset_number: string;
   asset_type: string;
   current_status: string;
+  current_condition: string;
   color: string | null;
   replacement_cost_cents: number;
   last_scan_at: string | null;
+  bin_code: string | null;
+  location_code: string | null;
+  order_number: string | null;
+  customer_name: string | null;
 };
-const money = (n: number) =>
+type Count = { current_status: string; count: number };
+
+const money = (cents: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    n / 100,
+    cents / 100,
   );
+const words = (value: string | null | undefined) =>
+  String(value ?? "").replaceAll("_", " ");
+const nextStep: Record<string, { mode: string; label: string }> = {
+  new: { mode: "receive", label: "Receive" },
+  reserved: { mode: "stage", label: "Stage" },
+  staged: { mode: "load", label: "Load" },
+  loaded: { mode: "deliver", label: "Deliver" },
+  out_for_delivery: { mode: "deliver", label: "Deliver" },
+  delivered: { mode: "pickup", label: "Pick up" },
+  rented: { mode: "pickup", label: "Pick up" },
+  pickup_scheduled: { mode: "pickup", label: "Pick up" },
+  picked_up: { mode: "warehouse_return", label: "Return to warehouse" },
+  dirty_return: { mode: "clean_start", label: "Start cleaning" },
+  cleaning: { mode: "clean_complete", label: "Complete cleaning" },
+  inspection_required: { mode: "inspect", label: "Pass inspection" },
+};
+const statusCards = [
+  { key: "new", label: "To receive", hint: "New equipment" },
+  { key: "dirty_return", label: "Returns", hint: "Need cleaning" },
+  { key: "cleaning", label: "Cleaning", hint: "In progress" },
+  { key: "inspection_required", label: "Inspect", hint: "Ready to check" },
+  { key: "clean_inventory", label: "Ready", hint: "Available to assign" },
+  { key: "in_field", label: "In the field", hint: "With a customer" },
+] as const;
+
 export function InventoryDesk() {
-  const [assets, setAssets] = useState<Asset[]>([]),
-    [status, setStatus] = useState(""),
-    [error, setError] = useState(""),
-    [saving, setSaving] = useState(false);
-  async function load() {
-    const r = await fetch("/api/assets");
-    if (!r.ok) {
-      setError("Sign in is required to manage inventory.");
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [statusCounts, setStatusCounts] = useState<Count[]>([]);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [type, setType] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+
+  const countFor = (key: string) => {
+    if (key === "in_field")
+      return statusCounts
+        .filter((count) => ["delivered", "rented", "pickup_scheduled"].includes(count.current_status))
+        .reduce((total, count) => total + count.count, 0);
+    return statusCounts.find((count) => count.current_status === key)?.count ?? 0;
+  };
+  const activeLabel = useMemo(
+    () => statusCards.find((card) => card.key === status)?.label ?? "All equipment",
+    [status],
+  );
+
+  async function load(next = { search, status, type }) {
+    const params = new URLSearchParams();
+    if (next.search.trim()) params.set("q", next.search.trim());
+    if (next.status) params.set("status", next.status);
+    if (next.type) params.set("type", next.type);
+    const response = await fetch(`/api/assets${params.size ? `?${params}` : ""}`);
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+      setError(payload?.error?.message ?? "Inventory could not be loaded.");
       return;
     }
-    setAssets(((await r.json()) as { assets: Asset[] }).assets);
+    const payload = (await response.json()) as { assets: Asset[]; statusCounts: Count[] };
+    setAssets(payload.assets);
+    setStatusCounts(payload.statusCounts);
   }
-  useEffect(() => {
-    void load();
-  }, []);
-  async function add(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    setSaving(true);
-    setError("");
+  useEffect(() => { void load({ search: "", status: "", type: "" }); }, []);
+
+  async function add(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setSaving(true); setError("");
     try {
-      const f = new FormData(form);
-      const r = await fetch("/api/assets", {
+      const values = new FormData(form);
+      const response = await fetch("/api/assets", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          assetType: f.get("assetType"),
-          quantity: Number(f.get("quantity")),
-          replacementCostCents: Math.round(
-            Number(f.get("replacementCostUsd")) * 100,
-          ),
-          color: f.get("color"),
+          assetType: values.get("assetType"),
+          quantity: Number(values.get("quantity")),
+          replacementCostCents: Math.round(Number(values.get("replacementCostUsd")) * 100),
+          color: values.get("color"),
         }),
       });
-      const p = (await r.json().catch(() => null)) as {
-        quantity?: number;
-        error?: { message?: string };
-      } | null;
-      if (!r.ok) {
-        setError(p?.error?.message ?? "Asset could not be added");
+      const payload = (await response.json().catch(() => null)) as { quantity?: number; error?: { message?: string } } | null;
+      if (!response.ok) {
+        setError(payload?.error?.message ?? "Equipment could not be added.");
         return;
       }
       form.reset();
-      setStatus(`${p?.quantity ?? 1} asset${p?.quantity === 1 ? "" : "s"} added. Receive them into clean inventory when ready.`);
+      setShowAdd(false);
+      setMessage(`${payload?.quantity ?? 1} item${payload?.quantity === 1 ? "" : "s"} added to the Receive queue.`);
       await load();
     } catch {
-      setError("Could not complete the asset add. If it was saved, reload the page to view it.");
-    } finally {
-      setSaving(false);
-    }
+      setError("The equipment could not be added. Nothing was refreshed until the request finished.");
+    } finally { setSaving(false); }
   }
-  async function receive(asset: Asset) {
-    setStatus("");
-    const r = await fetch("/api/scans", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-device-id": "staff-inventory-desk",
-      },
-      body: JSON.stringify({
-        idempotencyKey: `receive:${asset.id}:${Date.now()}`,
-        assetIdentifier: asset.asset_number,
-        mode: "receive",
-      }),
-    });
-    const p = (await r.json().catch(() => null)) as {
-      message?: string;
-      error?: { message?: string };
-    } | null;
-    setStatus(
-      r.ok
-        ? `${asset.asset_number} received into clean inventory.`
-        : (p?.message ?? p?.error?.message ?? "Scan failed"),
-    );
-    if (r.ok) void load();
-  }
-  async function remove(asset: Asset) {
-    if (!window.confirm(`Delete ${asset.asset_number}? This is only available before the asset is received or used.`)) return;
-    setError("");
-    const r = await fetch(`/api/assets/${asset.id}`, { method: "DELETE" });
-    const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
-    if (!r.ok) setError(p?.error?.message ?? "Asset could not be deleted");
-    else {
-      setStatus(`${asset.asset_number} deleted.`);
+
+  async function move(asset: Asset) {
+    const step = nextStep[asset.current_status];
+    if (!step) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const response = await fetch("/api/scans", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-device-id": "staff-inventory-desk" },
+        body: JSON.stringify({
+          idempotencyKey: `inventory-next:${asset.id}:${crypto.randomUUID()}`,
+          assetIdentifier: asset.asset_number,
+          mode: step.mode,
+          ...(step.mode === "inspect" ? { outcome: "pass" } : {}),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string; error?: { message?: string } } | null;
+      if (!response.ok) {
+        setError(payload?.message ?? payload?.error?.message ?? `${asset.asset_number} could not be moved.`);
+        return;
+      }
+      setMessage(`${asset.asset_number}: ${step.label.toLowerCase()} completed.`);
       await load();
-    }
+    } catch {
+      setError(`${asset.asset_number} could not be moved.`);
+    } finally { setSaving(false); }
   }
+
+  function selectQueue(key: string) {
+    const nextStatus = key;
+    setStatus(nextStatus); setSearch(""); setError("");
+    void load({ search: "", status: nextStatus, type });
+  }
+
   return (
-    <main className="desk">
-      <header className="desk-header">
-        <a href="/ops" className="back">
-          ← ToteOps
-        </a>
+    <main className="inventory-desk">
+      <header className="inventory-header">
         <div>
-          <p className="eyebrow">WAREHOUSE</p>
-          <h1>Inventory desk</h1>
+          <p className="eyebrow">WAREHOUSE CONTROL</p>
+          <h1>Inventory</h1>
+          <p>Work the next physical step first. Use the register only when you need to find an item.</p>
         </div>
-        <a className="login-link" href="/orders">
-          Order desk →
-        </a>
+        <div className="inventory-header-actions">
+          <a className="secondary" href="/bins">Open bin map</a>
+          <button className="primary" onClick={() => setShowAdd(true)}>Add equipment</button>
+        </div>
       </header>
-      <section className="desk-grid">
-        <form className="create-order" onSubmit={add}>
-          <p className="eyebrow">NEW ASSET</p>
-          <h2>Add equipment</h2>
-          <label>
-            Asset type
-            <select name="assetType" defaultValue="tote">
-              <option value="tote">Tote</option>
-              <option value="dolly">Dolly</option>
-              <option value="hand_truck">Hand truck</option>
-              <option value="blanket_pack">Blanket pack</option>
-              <option value="trailer">Trailer</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label>
-            Quantity
-            <input name="quantity" type="number" min="1" max="100" step="1" defaultValue="1" required />
-          </label>
-          <label>
-            Replacement value (USD)
-            <input
-              name="replacementCostUsd"
-              type="number"
-              min="0"
-              step="0.01"
-              defaultValue="25.00"
-              required
-            />
-          </label>
-          <label>
-            Color
-            <input name="color" placeholder="Blue" />
-          </label>
-          {error && <p className="form-error">{error}</p>}
-          <button className="primary" disabled={saving}>
-            {saving ? "Adding…" : "Add assets"}
+
+      <section className="inventory-queues" aria-label="Warehouse work queues">
+        {statusCards.map((card) => (
+          <button
+            key={card.key}
+            className={status === card.key ? "active" : ""}
+            onClick={() => selectQueue(card.key)}
+          >
+            <span>{card.label}</span><strong>{countFor(card.key)}</strong><small>{card.hint}</small>
           </button>
-          <p className="desk-hint">
-            New assets must be received before they can be reserved or scanned
-            into a rental.
-          </p>
-        </form>
-        <section className="order-list">
-          <div>
-            <p className="eyebrow">EQUIPMENT REGISTER</p>
-            <h2>Assets</h2>
-          </div>
-          {status && <p className="scan-status">{status}</p>}
-          <div className="orders-table">
-            {assets.map((a) => (
-              <article key={a.id}>
-                <div>
-                  <a className="record-link" href={`/inventory/${a.id}`}>
-                    {a.asset_number}
-                  </a>
-                  <span>
-                    {a.asset_type.replaceAll("_", " ")} ·{" "}
-                    {a.color || "No color"}
-                  </span>
-                </div>
-                <div>
-                  <span>{a.current_status.replaceAll("_", " ")}</span>
-                  <b>{money(a.replacement_cost_cents)}</b>
-                </div>
-                {a.current_status === "new" ? (
-                  <div className="record-actions"><button className="secondary" onClick={() => void receive(a)}>Receive</button><button className="danger" onClick={() => void remove(a)}>Delete</button></div>
-                ) : (
-                  <em>{a.current_status.replaceAll("_", " ")}</em>
-                )}
-              </article>
-            ))}
-          </div>
-          {assets.length === 0 && (
-            <p className="empty">No equipment has been added yet.</p>
-          )}
-        </section>
+        ))}
       </section>
+
+      <section className="inventory-register">
+        <header>
+          <div><p className="eyebrow">EQUIPMENT REGISTER</p><h2>{activeLabel}</h2></div>
+          <form onSubmit={(event) => { event.preventDefault(); void load(); }}>
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Asset, QR, bin, order, or customer" />
+            <select value={type} onChange={(event) => { const nextType = event.target.value; setType(nextType); void load({ search, status, type: nextType }); }}>
+              <option value="">All types</option><option value="tote">Totes</option><option value="dolly">Dollies</option><option value="hand_truck">Hand trucks</option><option value="blanket_pack">Blanket packs</option><option value="trailer">Trailers</option><option value="other">Other</option>
+            </select>
+            {(status || search || type) && <button type="button" className="secondary" onClick={() => { setSearch(""); setStatus(""); setType(""); void load({ search: "", status: "", type: "" }); }}>Clear</button>}
+            <button className="primary">Search</button>
+          </form>
+        </header>
+        {message && <p className="scan-status">{message}</p>}
+        {error && <p className="form-error">{error}</p>}
+        <div className="inventory-table">
+          <div className="inventory-table-head"><span>Equipment</span><span>Custody / location</span><span>Status</span><span>Next step</span></div>
+          {assets.map((asset) => {
+            const step = nextStep[asset.current_status];
+            return <article key={asset.id}>
+              <div><a className="record-link" href={`/inventory/${asset.id}`}>{asset.asset_number}</a><span>{words(asset.asset_type)} · {asset.color || "No color"} · {money(asset.replacement_cost_cents)}</span></div>
+              <div><strong>{asset.bin_code ? `${asset.location_code ?? "Warehouse"} · ${asset.bin_code}` : asset.order_number ? asset.order_number : "No bin recorded"}</strong><span>{asset.customer_name || (asset.order_number ? "Order assigned" : "Warehouse inventory")}</span></div>
+              <div><em className={`inventory-status status-${asset.current_status}`}>{words(asset.current_status)}</em><span>{asset.current_condition} condition</span></div>
+              <div className="inventory-row-action">
+                {step ? <button className="secondary" disabled={saving} onClick={() => void move(asset)}>{saving ? "Working…" : step.label}</button> : <span className="inventory-ready">{asset.current_status === "clean_inventory" ? "Ready to assign" : "Exception review required"}</span>}
+                <a href={`/inventory/${asset.id}`}>Details</a>
+              </div>
+            </article>;
+          })}
+        </div>
+        {!assets.length && <p className="empty">No equipment matches this view.</p>}
+      </section>
+
+      {showAdd && <div className="record-modal" role="dialog" aria-modal="true" aria-label="Add equipment">
+        <form className="record-editor inventory-add-modal" onSubmit={add}>
+          <header><div><p className="eyebrow">FAST INTAKE</p><h2>Add equipment</h2></div><button type="button" onClick={() => setShowAdd(false)} aria-label="Close">×</button></header>
+          <p className="desk-hint">New items go to the Receive queue. They become available only after staff receive them.</p>
+          <label>Equipment type<select name="assetType" defaultValue="tote"><option value="tote">Tote</option><option value="dolly">Dolly</option><option value="hand_truck">Hand truck</option><option value="blanket_pack">Blanket pack</option><option value="trailer">Trailer</option><option value="other">Other</option></select></label>
+          <div className="form-pair"><label>Quantity<input name="quantity" type="number" min="1" max="100" step="1" defaultValue="1" required /></label><label>Replacement value (USD)<input name="replacementCostUsd" type="number" min="0" step="0.01" defaultValue="25.00" required /></label></div>
+          <label>Color<input name="color" placeholder="Blue" /></label>
+          {error && <p className="form-error">{error}</p>}
+          <button className="primary" disabled={saving}>{saving ? "Adding…" : "Add to receive queue"}</button>
+        </form>
+      </div>}
     </main>
   );
 }

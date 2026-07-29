@@ -299,6 +299,15 @@ export function OpsRecord({
     const assigned = assets.filter((asset) => String(asset.asset_type) === requirement.type).length;
     return { ...requirement, assigned, stillNeeded: Math.max(0, requirement.required - assigned), cleanAvailable: Number(availability?.clean_available_count ?? 0) };
   });
+  const status = String(o.order_status ?? "inquiry");
+  const workflow = [
+    { label: "Book", detail: "Customer & schedule", href: "#schedule", statuses: ["inquiry", "quote", "awaiting_customer_approval", "awaiting_agreement", "awaiting_payment"] },
+    { label: "Prepare", detail: "Assign & stage", href: "#equipment", statuses: ["confirmed", "equipment_reserved", "staged"] },
+    { label: "Deliver", detail: "Dispatch & delivery", href: "#equipment", statuses: ["delivery_assigned", "out_for_delivery"] },
+    { label: "Rental", detail: "Customer has equipment", href: "#schedule", statuses: ["delivered", "active_rental"] },
+    { label: "Return", detail: "Pickup & reconcile", href: "#equipment", statuses: ["pickup_scheduled", "pickup_assigned", "picked_up", "equipment_reconciliation", "cleaning", "final_invoice_review", "completed", "closed"] },
+  ];
+  const currentWorkflowIndex = Math.max(0, workflow.findIndex((step) => step.statuses.includes(status)));
   return (
     <main className="record">
       <a href={`/customers/${String(o.customer_id)}`} className="back">
@@ -321,6 +330,18 @@ export function OpsRecord({
       </header>
       {error && <p className="form-error">{error}</p>}
       {notice && <p className="scan-status">{notice}</p>}
+      <nav className="order-workflow" aria-label="Order lifecycle">
+        {workflow.map((step, index) => (
+          <a
+            href={step.href}
+            key={step.label}
+            className={index === currentWorkflowIndex ? "current" : index < currentWorkflowIndex ? "complete" : ""}
+          >
+            <span>{step.label}</span>
+            <strong>{step.detail}</strong>
+          </a>
+        ))}
+      </nav>
       <div className="record-kpis">
         <article>
           <span>Balance due</span>
@@ -337,7 +358,14 @@ export function OpsRecord({
           <small>{String(o.preferred_pickup_window ?? "Time not selected")}</small>
         </article>
       </div>
-      <section className="record-editor">
+      <nav className="record-jump-nav" aria-label="Order workspace sections">
+        <a href="#schedule">Schedule</a>
+        <a href="#equipment">Equipment</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#billing">Contracts & billing</a>
+        <a href="#history">History</a>
+      </nav>
+      <section className="record-editor" id="schedule">
         <h2>Customer schedule & addresses</h2>
         <div className="record-grid">
           <div>
@@ -516,7 +544,7 @@ export function OpsRecord({
           ))}
           {assets.length ? <p className="desk-hint">Assigned assets are listed in Dispatch & equipment below.</p> : <p className="desk-hint">No serialized equipment has been assigned yet. Reserve the package inventory before staging.</p>}
         </section>
-        <section>
+        <section id="pricing">
           <h2>Pricing & discount</h2>
           <form
             className="record-form"
@@ -606,7 +634,7 @@ export function OpsRecord({
             </form>
           )}
         </section>
-        <section>
+        <section id="equipment">
           <div className="section-heading">
             <h2>Dispatch & equipment</h2>
             <button type="button" className="primary" disabled={saving} onClick={() => void advanceEquipment()}>
@@ -650,7 +678,7 @@ export function OpsRecord({
             </div>
           ))}
         </section>
-        <section>
+        <section id="billing">
           <h2>Contracts & billing</h2>
           {agreements.map((a, i) => (
             <div className="record-row" key={i}>
@@ -674,7 +702,7 @@ export function OpsRecord({
             </div>
           ))}
         </section>
-        <section>
+        <section id="history">
           <h2>Order history</h2>
           {history.map((h, i) => (
             <div className="timeline" key={i}>
