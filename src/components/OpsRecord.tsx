@@ -321,6 +321,13 @@ export function OpsRecord({
     { label: "Return", detail: "Pickup & reconcile", href: "#equipment", statuses: ["pickup_scheduled", "pickup_assigned", "picked_up", "equipment_reconciliation", "cleaning", "final_invoice_review", "completed", "closed"] },
   ];
   const currentWorkflowIndex = Math.max(0, workflow.findIndex((step) => step.statuses.includes(status)));
+  const equipmentActionLabel = assets.some((asset) => String(asset.current_status) === "reserved") ? "Stage all equipment"
+    : assets.some((asset) => String(asset.current_status) === "staged") ? "Load all equipment"
+    : assets.some((asset) => String(asset.current_status) === "loaded") ? "Deliver all equipment"
+    : assets.some((asset) => ["delivered", "rented", "pickup_scheduled"].includes(String(asset.current_status))) ? "Pick up all equipment"
+    : assets.some((asset) => String(asset.current_status) === "picked_up") ? "Return all equipment to warehouse"
+    : "Equipment complete";
+  const hasEquipmentAction = equipmentActionLabel !== "Equipment complete";
   function printPickList() {
     const escape = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
     const lines = assets.map((asset) => `<tr><td>${escape(asset.asset_number)}</td><td>${escape(words(asset.asset_type))}</td><td>${escape(words(asset.current_status))}</td></tr>`).join("");
@@ -657,11 +664,11 @@ export function OpsRecord({
         <section id="equipment">
           <div className="section-heading">
             <h2>Dispatch & equipment</h2>
-            <button type="button" className="primary" disabled={saving} onClick={() => void advanceEquipment()}>
-              {saving ? "Working…" : assets.some((asset) => String(asset.current_status) === "reserved") ? "Stage all equipment" : assets.some((asset) => String(asset.current_status) === "staged") ? "Load all equipment" : assets.some((asset) => String(asset.current_status) === "loaded") ? "Deliver all equipment" : assets.some((asset) => ["delivered", "rented", "pickup_scheduled"].includes(String(asset.current_status))) ? "Pick up all equipment" : "Equipment complete"}
+            <button type="button" className="primary" disabled={saving || !hasEquipmentAction} onClick={() => void advanceEquipment()}>
+              {saving ? "Working…" : equipmentActionLabel}
             </button>
           </div>
-          <p className="desk-hint">One guided action moves all assigned equipment through: stage, load, deliver, then pick up.</p>
+          <p className="desk-hint">One guided action moves all assigned equipment through: stage, load, deliver, pick up, then warehouse return.</p>
           <div className="record-grid">
             <section>
               <h3>Assign package equipment</h3>
