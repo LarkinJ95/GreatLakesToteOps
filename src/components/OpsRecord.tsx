@@ -142,6 +142,18 @@ export function OpsRecord({
       await load();
     } catch { setError("The contract could not be generated."); } finally { setSaving(false); }
   }
+  async function finalizeOrder(toStatus: "completed" | "closed") {
+    const label = toStatus === "closed" ? "close this order" : "mark this order complete";
+    if (toStatus === "closed" && !window.confirm("Close this order? Closed orders are retained for history and cannot be edited.")) return;
+    setSaving(true); setError(""); setNotice(toStatus === "closed" ? "Closing order…" : "Completing order…");
+    try {
+      const r = await fetch(`/api/orders/${id}/transition`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ toStatus, reason: toStatus === "closed" ? "Operations and final billing complete" : "Final invoice review complete" }) });
+      const p = (await r.json().catch(() => null)) as { error?: { message?: string } } | null;
+      if (!r.ok) { setError(p?.error?.message ?? "The order could not be finalized."); return; }
+      setNotice(toStatus === "closed" ? "Order closed and retained in history." : "Order marked complete. Close it when you are ready to lock the record.");
+      await load();
+    } catch { setError("The order could not be finalized."); } finally { setSaving(false); }
+  }
   if (!data)
     return (
       <main className="record">
@@ -333,6 +345,9 @@ export function OpsRecord({
           </span>
         </div>
         <div className="record-actions">
+          {status === "final_invoice_review" && <button className="primary" disabled={saving} onClick={() => void finalizeOrder("completed")}>{saving ? "Working…" : "Mark complete"}</button>}
+          {status === "completed" && <button className="primary" disabled={saving} onClick={() => void finalizeOrder("closed")}>{saving ? "Working…" : "Close order"}</button>}
+          {status === "closed" && <span className="inventory-ready">Order closed</span>}
           <button className="danger" onClick={() => void removeRecord()} disabled={saving}>
             Delete order
           </button>
