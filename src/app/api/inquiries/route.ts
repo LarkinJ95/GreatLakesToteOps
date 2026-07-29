@@ -34,6 +34,31 @@ export const PATCH = withErrorHandling(async (request) => {
   return Response.json({ ok: true });
 });
 
+/** Delete an inbox-only record without affecting any customer or order created from it. */
+export const DELETE = withErrorHandling(async (request) => {
+  const ctx = await requireUser(request);
+  requirePermission(ctx, "customers.delete", "customers.edit");
+  const env = await getEnv();
+  const body = await jsonBody<Record<string, unknown>>(request);
+  const recordId = requiredString(body.id, "id", 100);
+  const source = requiredString(body.source, "source", 20);
+  let record: InboxRow | null = null;
+
+  if (source === "inquiry") {
+    record = await one<InboxRow>(env.DB, "SELECT id,'inquiry' source,inquiry_type,name,email,phone,payload_json,status,created_at FROM public_inquiries WHERE id=?", recordId);
+    if (record) await run(env.DB, "DELETE FROM public_inquiries WHERE id=?", recordId);
+  } else if (source === "lead") {
+    record = await one<InboxRow>(env.DB, "SELECT id,'lead' source,lead_type inquiry_type,NULL name,NULL email,NULL phone,payload_json,pipeline_status status,created_at FROM public_leads WHERE id=?", recordId);
+    if (record) await run(env.DB, "DELETE FROM public_leads WHERE id=?", recordId);
+  } else {
+    throw new ValidationError("Invalid inquiry source");
+  }
+
+  if (!record) throw new NotFoundError("Inquiry");
+  await audit(env.DB, { actorUserId: ctx.user.id, action: "inquiry.deleted", entityType: source, entityId: recordId, detail: { source, inquiryType: record.inquiry_type, status: record.status }, ip: ctx.ip });
+  return Response.json({ ok: true });
+});
+
 export const POST = withErrorHandling(async (request) => {
   const ctx = await requireUser(request);
   requirePermission(ctx, "customers.create", "orders.create");
