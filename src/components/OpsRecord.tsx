@@ -328,7 +328,7 @@ export function OpsRecord({
     popup.document.close();
   }
   return (
-    <main className="record">
+    <main className="record order-record">
       <a href={`/customers/${String(o.customer_id)}`} className="back">
         ← {String(o.customer_name)}
       </a>
