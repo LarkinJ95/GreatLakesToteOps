@@ -142,6 +142,24 @@ export function InventoryDesk() {
     } finally { setSaving(false); }
   }
 
+  const bulkAction = countFor("cleaning") > 0
+    ? { action: "complete_cleaning", label: "Mark all clean" }
+    : countFor("inspection_required") > 0
+      ? { action: "pass_inspection", label: "Pass inspection for all" }
+      : null;
+  async function runBulkAction() {
+    if (!bulkAction) return;
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const response = await fetch("/api/assets/bulk-action", { method: "POST", headers: { "content-type": "application/json", "x-device-id": "staff-inventory-bulk-action" }, body: JSON.stringify({ action: bulkAction.action }) });
+      const payload = (await response.json().catch(() => null)) as { label?: string; completed?: string[]; failed?: { message: string }[]; error?: { message?: string } } | null;
+      if (!response.ok) { setError(payload?.error?.message ?? "The bulk inventory action could not be completed."); return; }
+      const completed = payload?.completed?.length ?? 0, failed = payload?.failed?.length ?? 0;
+      setMessage(completed ? `${payload?.label ?? "Inventory updated"}: ${completed} item${completed === 1 ? "" : "s"}${failed ? `; ${failed} need attention.` : "."}` : "No items were waiting for that step.");
+      await load();
+    } catch { setError("The bulk inventory action could not be completed."); } finally { setSaving(false); }
+  }
+
   function selectQueue(key: string) {
     const nextStatus = key;
     setStatus(nextStatus); setSearch(""); setError("");
@@ -157,6 +175,7 @@ export function InventoryDesk() {
           <p>Work the next physical step first. Use the register only when you need to find an item.</p>
         </div>
         <div className="inventory-header-actions">
+          {bulkAction && <button className="secondary" disabled={saving} onClick={() => void runBulkAction()}>{saving ? "Working…" : bulkAction.label}</button>}
           <button className="primary" onClick={() => setShowAdd(true)}>Add equipment</button>
         </div>
       </header>
